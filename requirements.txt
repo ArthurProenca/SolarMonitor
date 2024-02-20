@@ -7,3 +7,4 @@ numpy==1.24.4
 opencv_python==4.9.0.80
 opencv_python_headless==4.9.0.80
 Requests==2.31.0
+hypercorn==0.14.4
