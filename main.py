@@ -51,12 +51,11 @@ def get_solar_monitor_info(
     if is_backward:
         final_date = utils.get_negative_days_arr(initial_date, number_of_days)
 
-    days_arr, table_contents, images = utils.get_solar_monitor_info(initial_date, final_date, is_backward)
+    days_arr, table_contents, _ = utils.get_solar_monitor_info(initial_date, final_date, is_backward)
 
     table_contents_aux = utils.convert_table_contents_to_json(table_contents)
     result = []
 
-    images = utils.download_and_preprocess_images(images, days_arr)
 
     utils.process_positions(table_contents_aux, result, days_arr)
 
@@ -64,6 +63,7 @@ def get_solar_monitor_info(
         result = utils.get_by_noaa_number(result, sunspot_numbers)
 
     img_bytes = BytesIO()
+    print(result)
 
     graphic_utils.create_graphic(result, img_bytes)
 

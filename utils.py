@@ -69,10 +69,8 @@ def process_positions(table_contents_aux, result, days_arr):
             x_coordinate = entry['Coordinate X'].replace('"', '')
             y_coordinate = entry['Coordinate Y'].replace('"', '')
 
-            longitude = int(x_coordinate) * 0.09
-            latitude = int(y_coordinate) * 0.09
-            longitude = round(longitude, 2)
-            latitude = round(latitude, 2)
+            longitude = int(x_coordinate)
+            latitude = int(y_coordinate)
 
             day = days_arr[i]  # Corresponding day to the current item
             found = False

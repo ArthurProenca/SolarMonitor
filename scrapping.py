@@ -10,6 +10,18 @@ import numpy as np
 base_url = "https://www.solarmonitor.org"
 solar_monitor_url = base_url + "/full_disk.php?date={}&type=shmi_maglc&indexnum=1"
 
+def get_x_coordinate(coordinates_match):
+    if coordinates_match[0] == "N":
+        return "-" + coordinates_match[1:3]
+    else:
+        return coordinates_match[1:3]
+    
+def get_y_coordinate(coordinates_match):
+    if coordinates_match[3] == "E":
+        return "-" + coordinates_match[4:6]
+    else:
+        return coordinates_match[4:6]
+
 def get_html(url):
     return requests.get(url)
 
@@ -28,7 +40,6 @@ def get_table_content_from_date(year, month, day):
     # Supondo que você tenha a função get_soup e a URL correta definida
     html_content = get_soup(get_html(solar_monitor_url.format(year + month + day, "")))
     tables = html_content.find_all('div', class_='noaat')
-    ordered_pair_regex_pattern = re.compile(r'\((.*?)\)')
 
     data = []
 
@@ -36,9 +47,13 @@ def get_table_content_from_date(year, month, day):
         rows = table.find_all('tr', class_='noaaresults')
         for row in rows:
             cells = row.find_all('td')
-            coordinates_match = ordered_pair_regex_pattern.findall(cells[1].text.strip())
-            coordinate_x = coordinates_match[0].split(",")[0]
-            coordinate_y = coordinates_match[0].split(",")[1]
+            #Get first 6 digits from cells[1].text.strip()
+            coordinates_match = cells[1].text.strip()[:6]
+            print(coordinates_match)
+
+            coordinate_x = get_y_coordinate(coordinates_match)
+            coordinate_y = get_x_coordinate(coordinates_match)
+            print(coordinate_x, coordinate_y)
             entry = {
                 "NOAA Number": cells[0].text.strip(),
                 "Latest Position": cells[1].text.strip(),

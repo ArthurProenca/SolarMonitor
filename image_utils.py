@@ -1,13 +1,13 @@
 import easyocr
 import cv2
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 def highlight_text_in_images(images, texts):
     # Create an EasyOCR reader with the desired language
     reader = easyocr.Reader(['en'])
-
-    # For each image, highlight the specified text
-    for i, image in enumerate(images):
+    
+    def process_image(image):
         # Convert the image to a NumPy array
         image_np = np.array(image)
 
@@ -28,9 +28,13 @@ def highlight_text_in_images(images, texts):
 
         # Convert the image back to the original format
         image = cv2.cvtColor(image_np_rgb, cv2.COLOR_RGB2BGR)
-        images[i] = image
+        return image
 
-    return images
+    # Use ThreadPoolExecutor for parallel processing
+    with ThreadPoolExecutor() as executor:
+        processed_images = list(executor.map(process_image, images))
+
+    return processed_images
 
 def preprocess_image(image, day):
     # Convert the image to grayscale
