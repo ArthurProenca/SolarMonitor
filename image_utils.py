@@ -66,6 +66,8 @@ def preprocess_image(image, day):
 
         # Add the 'day' content to the top left corner of the cropped image
         font = cv2.FONT_HERSHEY_SIMPLEX
+        day = str(day)
+        day = day.replace("00:00:00", "")
         cv2.putText(cropped_image, day, (10, 30), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
         return cropped_image

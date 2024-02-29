@@ -49,11 +49,9 @@ def get_table_content_from_date(year, month, day):
             cells = row.find_all('td')
             #Get first 6 digits from cells[1].text.strip()
             coordinates_match = cells[1].text.strip()[:6]
-            print(coordinates_match)
 
             coordinate_x = get_y_coordinate(coordinates_match)
             coordinate_y = get_x_coordinate(coordinates_match)
-            print(coordinate_x, coordinate_y)
             entry = {
                 "NOAA Number": cells[0].text.strip(),
                 "Latest Position": cells[1].text.strip(),
