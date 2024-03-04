@@ -1,9 +1,20 @@
 import datetime
 import scrapping
-import image_utils
 import json
 import csv
-import zipfile
+
+def get_days_arr(initial_date, number_of_days):
+    initial_date = datetime.datetime.strptime(initial_date, "%Y-%m-%d")
+    final_date = get_positive_days_arr(initial_date, number_of_days)
+    days_arr = []
+    current_date = initial_date
+    while current_date <= final_date:
+            current_date_str = current_date.strftime("%Y-%m-%d")
+            days_arr.append(current_date_str)
+            
+            current_date += datetime.timedelta(days=1)
+    return days_arr
+
 
 def convert_to_csv(data, csv_file):
     csv_rows = []
@@ -45,47 +56,21 @@ def get_positive_days_arr(initial_date, number_of_days):
 def get_negative_days_arr(initial_date, number_of_days): 
     return initial_date - datetime.timedelta(days=number_of_days)
 
-def get_solar_monitor_info(initial_date, final_date, is_backward):
-    days_arr = []
-    table_contents = []
-    images = []
-    current_date = initial_date
-
-    if is_backward:
-        while current_date >= final_date:
-            current_date_str = current_date.strftime("%Y-%m-%d")
-
-            days_arr.append(current_date_str)
-            
-            table_contents.append(scrapping.get_table_content_from_date(current_date_str.split("-")[0],
-                                                              current_date_str.split("-")[1],
-                                                              current_date_str.split("-")[2]))
-            images.append(scrapping.get_table_image_from_date(current_date_str.split("-")[0],
+def get_solar_monitor_images(date: datetime.datetime):
+    current_date_str = date.strftime("%Y-%m-%d")
+    return [scrapping.get_table_image_from_date(current_date_str.split("-")[0],
                                                                  current_date_str.split("-")[1],
-                                                                 current_date_str.split("-")[2]))
-            
-            current_date -= datetime.timedelta(days=1)
-        return days_arr, table_contents, images
-    else:
-        while current_date <= final_date:
-            current_date_str = current_date.strftime("%Y-%m-%d")
+                                                                 current_date_str.split("-")[2])]
 
-            days_arr.append(current_date_str)
-            
-            table_contents.append(scrapping.get_table_content_from_date(current_date_str.split("-")[0],
-                                                            current_date_str.split("-")[1],
-                                                            current_date_str.split("-")[2]))
-            images.append(scrapping.get_table_image_from_date(current_date_str.split("-")[0],
-                                                                current_date_str.split("-")[1],
-                                                                current_date_str.split("-")[2]))
-            
-            current_date += datetime.timedelta(days=1)
+def get_solar_monitor_info(date_arr):
+    table_contents = []
 
-        return days_arr, table_contents, images
+    for day in date_arr:
+        table_contents.append(scrapping.get_table_content_from_date(day.split("-")[0],
+                                                              day.split("-")[1],
+                                                              day.split("-")[2]))
 
-def download_and_preprocess_images(images, days_arr):
-    images = [scrapping.download_img(image) for image in images]
-    return [image_utils.preprocess_image(image, day) for image, day in zip(images, days_arr)]
+    return table_contents
 
 def convert_table_contents_to_json(table_contents):
     return [json.loads(table_content) for table_content in table_contents]

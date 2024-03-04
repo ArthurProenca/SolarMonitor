@@ -2,11 +2,23 @@ import easyocr
 import cv2
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
+import io
+import imageio
+import scrapping
+
+reader = easyocr.Reader(['en'])
+
+def download_and_preprocess_images(images, days_arr):
+    images = [scrapping.download_img(image) for image in images]
+    return [preprocess_image(image, day) for image, day in zip(images, days_arr)]
+
+def create_gif(images):
+    gif_bytes = io.BytesIO()
+    imageio.mimsave(gif_bytes, images, format='gif', fps=1, loop=0)
+    gif_bytes.seek(0)
+    return gif_bytes
 
 def highlight_text_in_images(images, texts):
-    # Create an EasyOCR reader with the desired language
-    reader = easyocr.Reader(['en'])
-    
     def process_image(image):
         # Convert the image to a NumPy array
         image_np = np.array(image)

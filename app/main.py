@@ -1,7 +1,6 @@
 from typing import List
 from fastapi import FastAPI, Query, Response
 from fastapi.responses import StreamingResponse
-from io import BytesIO
 import datetime
 import image_utils
 import graphic_utils
@@ -27,39 +26,25 @@ app.add_middleware(
     allow_headers=["*"],  # You can replace "*" with your allowed headers
 )
 
-
-def download_and_preprocess_image(day, is_backward):
+def download_and_preprocess_image(day):
     day = datetime.strptime(day, "%Y-%m-%d")  # Convert day to datetime object
-    _, _, images = utils.get_solar_monitor_info(day, day, is_backward)
-    return utils.download_and_preprocess_images(images, [day])[0]
+    images = utils.get_solar_monitor_images(day)
+    return image_utils.download_and_preprocess_images(images, [day])[0]
 
 @app.get("/solar-monitor/{initial_date}/{number_of_days}/gif")
 def get_solar_monitor_gif_from_days(initial_date: str, 
                                     number_of_days: int, 
-                                    sunspot_numbers: List[str] = Query(None, description="Sunspot number"),
-                                    is_backward: bool = Query(False, description="Whether to go backward in time")):
+                                    sunspot_numbers: List[str] = Query(None)):
+    days_arr = utils.get_days_arr(initial_date, number_of_days)
 
-    initial_date = datetime.strptime(initial_date, "%Y-%m-%d")
-    final_date = utils.get_positive_days_arr(initial_date, number_of_days)
-
-    if is_backward:
-        final_date = utils.get_negative_days_arr(initial_date, number_of_days)
-
-    days_arr, _, _ = utils.get_solar_monitor_info(initial_date, final_date, is_backward)
-
-    # Use ThreadPoolExecutor to download and preprocess images concurrently
     with ThreadPoolExecutor() as executor:
-        download_and_preprocess_partial = functools.partial(download_and_preprocess_image, is_backward=is_backward)
+        download_and_preprocess_partial = functools.partial(download_and_preprocess_image)
         images = list(executor.map(download_and_preprocess_partial, days_arr))
 
     if sunspot_numbers is not None:
         images = image_utils.highlight_text_in_images(images, sunspot_numbers)
 
-    gif_bytes = BytesIO()
-    imageio.mimsave(gif_bytes, images, format='gif', fps=1, loop=0)
-    gif_bytes.seek(0)
-
-    return StreamingResponse(gif_bytes, media_type="image/gif")
+    return StreamingResponse(image_utils.create_gif(images), media_type="image/gif")
 
 
 
@@ -67,19 +52,15 @@ def get_solar_monitor_gif_from_days(initial_date: str,
 def get_solar_monitor_info(
         initial_date: str,
         number_of_days: int,
-        sunspot_numbers: List[str] = Query(None, description="Sunspot number"),
-        is_backward: bool = Query(False, description="Whether to go backward in time"),
-        do_adjustment: bool = Query(True, description="Without straight adjustment")
+        sunspot_numbers: List[str] = Query(None),
+        do_adjustment: bool = Query(True)
 ):
-    initial_date = datetime.strptime(initial_date, "%Y-%m-%d")
-    final_date = utils.get_positive_days_arr(initial_date, number_of_days)
+    days_arr = utils.get_days_arr(initial_date, number_of_days)
+    final_date = days_arr[-1]
 
-    if is_backward:
-        final_date = utils.get_negative_days_arr(initial_date, number_of_days)
-
-    days_arr, table_contents, _ = utils.get_solar_monitor_info(initial_date, final_date, is_backward)
-
-    table_contents_aux = utils.convert_table_contents_to_json(table_contents)
+    solar_monitor_info = utils.get_solar_monitor_info(days_arr)
+    table_contents_aux = utils.convert_table_contents_to_json(solar_monitor_info)
+    
     result = []
 
     utils.process_positions(table_contents_aux, result, days_arr)
@@ -87,13 +68,12 @@ def get_solar_monitor_info(
     if sunspot_numbers is not None:
         result = utils.get_by_noaa_number(result, sunspot_numbers)
 
-    img_bytes = BytesIO()
+    img_bytes = io.BytesIO()
+    
     initial_date = str(initial_date).replace("00:00:00", "")
     final_date = str(final_date).replace("00:00:00", "")
-    # Use ThreadPoolExecutor to create graphic in a separate thread
-    with ThreadPoolExecutor() as executor:
-        create_graphic_partial = functools.partial(graphic_utils.create_graphic, result, img_bytes, initial_date, final_date, do_adjustment)
-        executor.submit(create_graphic_partial).result()
+    
+    graphic_utils.create_graphic(result, img_bytes, initial_date, final_date, do_adjustment)
 
     img_bytes.seek(0)
     return StreamingResponse(img_bytes, media_type="image/png")
@@ -102,13 +82,11 @@ def get_solar_monitor_info(
 def get_solar_monitor_info(
         initial_date: str,
         number_of_days: int,
-        is_backward: bool = Query(False, description="Whether to go backward in time"),
         sunspot_numbers: List[str] = Query(None, description="Sunspot number")
 ):
-    initial_date = datetime.strptime(initial_date, "%Y-%m-%d")
-    final_date = utils.get_positive_days_arr(initial_date, number_of_days)
+    days_arr = utils.get_days_arr(initial_date, number_of_days)
 
-    days_arr, table_contents, _ = utils.get_solar_monitor_info(initial_date, final_date, is_backward)
+    table_contents = utils.get_solar_monitor_info(days_arr)
 
     table_contents_aux = utils.convert_table_contents_to_json(table_contents)
     result = []
@@ -120,14 +98,14 @@ def get_solar_monitor_info(
 
     # Use ThreadPoolExecutor to download and preprocess images concurrently
     with ThreadPoolExecutor() as executor:
-        download_and_preprocess_partial = functools.partial(download_and_preprocess_image, is_backward=is_backward)
+        download_and_preprocess_partial = functools.partial(download_and_preprocess_image)
         images = list(executor.map(download_and_preprocess_partial, days_arr))
 
-    gif_bytes = BytesIO()
+    gif_bytes = io.BytesIO()
     imageio.mimsave(gif_bytes, images, format='gif', fps=1, loop=0)
     gif_bytes.seek(0)
 
-    zip_buffer = BytesIO()
+    zip_buffer = io.BytesIO()
 
     # Create a ZipFile object to write to the buffer
     with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
