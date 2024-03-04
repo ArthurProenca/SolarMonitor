@@ -15,7 +15,7 @@ def extract_x_value(position):
     x_value = re.search(r'\(([-+]?\d+)', position).group(1)
     return int(x_value)
 
-def create_graphic(result, img_bytes, initial_date, final_date):
+def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
     plt.figure(figsize=(18, 8))  # Adjust the height of the figure
 
     for entry in result:
@@ -31,7 +31,7 @@ def create_graphic(result, img_bytes, initial_date, final_date):
         # Check if there are enough points for linear regression
         if len(dates) >= 2:
             plt.scatter(dates, longitudes, label=f'Mancha {noaa_number}, latitude média: {medium(latitudes):.2f}', s=50, alpha=0.7)  # Add transparency for better visibility
-
+            
             x_values = mdates.date2num(dates)
             coefficients = np.polyfit(x_values, longitudes, 1)
             a, b = coefficients
@@ -39,7 +39,8 @@ def create_graphic(result, img_bytes, initial_date, final_date):
             fitted_dates = np.linspace(min(x_values), max(x_values), 100)
             fitted_dates_original_format = mdates.num2date(fitted_dates)
 
-            plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (a={a:.2f})', linestyle='--')
+            if do_adjustment:
+                plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (a={a:.2f})', linestyle='--')
 
     plt.xlabel('Dia', fontsize=12)
     plt.ylabel('Longitude', fontsize=12)

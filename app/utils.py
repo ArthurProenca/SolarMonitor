@@ -2,6 +2,35 @@ import datetime
 import scrapping
 import image_utils
 import json
+import csv
+import zipfile
+
+def convert_to_csv(data, csv_file):
+    csv_rows = []
+
+    # Adiciona o cabeçalho
+    header = ['noaaNumber', 'day', 'x_coordinate', 'y_coordinate', 'longitude', 'latitude']
+    csv_rows.append(header)
+
+    # Itera sobre os dados e adiciona as linhas ao CSV
+    for entry in data:
+        noaa_number = entry['noaaNumber']
+        positions = entry['latestPositions']
+
+        for position in positions:
+            day = position['day']
+            x_coordinate = position['x_coordinate']
+            y_coordinate = position['y_coordinate']
+            longitude = position['longitude']
+            latitude = position['latitude']
+
+            row = [noaa_number, day, x_coordinate, y_coordinate, longitude, latitude]
+            csv_rows.append(row)
+
+    # Escreve no arquivo CSV
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerows(csv_rows)
+
 
 def get_by_noaa_number(result, noaa_numbers):
     selected_items_arr = []

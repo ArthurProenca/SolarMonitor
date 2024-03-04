@@ -4,6 +4,6 @@ fastapi==0.110.0
 imageio==2.34.0
 matplotlib==3.7.5
 numpy==1.24.4
-opencv_python==4.9.0.80
 opencv_python_headless==4.9.0.80
 Requests==2.31.0
+uvicorn==0.27.1
