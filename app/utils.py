@@ -2,8 +2,12 @@ import datetime
 import scrapping
 import json
 import csv
+from fastapi import  HTTPException
 
 def get_days_arr(initial_date, number_of_days):
+    if initial_date is None or number_of_days is None:
+        raise HTTPException(status_code=400, detail="Both initial_date and number_of_days must be provided.")
+
     initial_date = datetime.datetime.strptime(initial_date, "%Y-%m-%d")
     final_date = get_positive_days_arr(initial_date, number_of_days)
     days_arr = []

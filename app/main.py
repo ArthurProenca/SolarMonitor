@@ -1,29 +1,27 @@
 from typing import List
-from fastapi import FastAPI, Query, Response
+from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse
 import datetime
 import image_utils
 import graphic_utils
 import utils
-import imageio
 from concurrent.futures import ThreadPoolExecutor
 import functools
 from datetime import datetime
-import zipfile
 import io
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
 # Configure CORS middleware
-origins = ["*"]  # You can replace "*" with your allowed origins
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # You can replace "*" with your allowed methods
-    allow_headers=["*"],  # You can replace "*" with your allowed headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 def download_and_preprocess_image(day):
@@ -31,28 +29,36 @@ def download_and_preprocess_image(day):
     images = utils.get_solar_monitor_images(day)
     return image_utils.download_and_preprocess_images(images, [day])[0]
 
-@app.get("/solar-monitor/{initial_date}/{number_of_days}/gif")
-def get_solar_monitor_gif_from_days(initial_date: str, 
-                                    number_of_days: int, 
-                                    sunspot_numbers: List[str] = Query(None)):
+@app.get("/solar-monitor/gif")
+def get_solar_monitor_gif_from_days(initial_date: str = Query(None),
+                                    number_of_days: int = Query(0),
+                                    sunspot: List[str] = Query(None),
+                                    download: bool = Query(False)):
     days_arr = utils.get_days_arr(initial_date, number_of_days)
 
     with ThreadPoolExecutor() as executor:
         download_and_preprocess_partial = functools.partial(download_and_preprocess_image)
         images = list(executor.map(download_and_preprocess_partial, days_arr))
 
-    if sunspot_numbers is not None:
-        images = image_utils.highlight_text_in_images(images, sunspot_numbers)
+    if sunspot is not None:
+        images = image_utils.highlight_text_in_images(images, sunspot)
+    
+    gif_bytes = image_utils.create_gif(images)
 
-    return StreamingResponse(image_utils.create_gif(images), media_type="image/gif")
+    if download:
+        response = StreamingResponse(gif_bytes, media_type="image/gif")
+        response.headers["Content-Disposition"] = 'attachment; filename="solar_monitor.gif"'
+        return response
+    else:
+        return StreamingResponse(gif_bytes, media_type="image/gif")
 
 
 
-@app.get("/solar-monitor/{initial_date}/{number_of_days}")
+@app.get("/solar-monitor")
 def get_solar_monitor_info(
-        initial_date: str,
-        number_of_days: int,
-        sunspot_numbers: List[str] = Query(None),
+        initial_date: str = Query(None),
+        number_of_days: int = Query(None),
+        sunspot: List[str] = Query(None),
         do_adjustment: bool = Query(True)
 ):
     days_arr = utils.get_days_arr(initial_date, number_of_days)
@@ -65,8 +71,8 @@ def get_solar_monitor_info(
 
     utils.process_positions(table_contents_aux, result, days_arr)
 
-    if sunspot_numbers is not None:
-        result = utils.get_by_noaa_number(result, sunspot_numbers)
+    if sunspot is not None:
+        result = utils.get_by_noaa_number(result, sunspot)
 
     img_bytes = io.BytesIO()
     
@@ -77,57 +83,3 @@ def get_solar_monitor_info(
 
     img_bytes.seek(0)
     return StreamingResponse(img_bytes, media_type="image/png")
-
-@app.get("/solar-monitor/{initial_date}/{number_of_days}/zip")
-def get_solar_monitor_info(
-        initial_date: str,
-        number_of_days: int,
-        sunspot_numbers: List[str] = Query(None, description="Sunspot number")
-):
-    days_arr = utils.get_days_arr(initial_date, number_of_days)
-
-    table_contents = utils.get_solar_monitor_info(days_arr)
-
-    table_contents_aux = utils.convert_table_contents_to_json(table_contents)
-    result = []
-
-    utils.process_positions(table_contents_aux, result, days_arr)
-
-    if sunspot_numbers is not None:
-        result = utils.get_by_noaa_number(result, sunspot_numbers)
-
-    # Use ThreadPoolExecutor to download and preprocess images concurrently
-    with ThreadPoolExecutor() as executor:
-        download_and_preprocess_partial = functools.partial(download_and_preprocess_image)
-        images = list(executor.map(download_and_preprocess_partial, days_arr))
-
-    gif_bytes = io.BytesIO()
-    imageio.mimsave(gif_bytes, images, format='gif', fps=1, loop=0)
-    gif_bytes.seek(0)
-
-    zip_buffer = io.BytesIO()
-
-    # Create a ZipFile object to write to the buffer
-    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
-        # Create a CSV file in memory
-        csv_buffer = io.StringIO()
-        utils.convert_to_csv(result, csv_buffer)
-
-
-        # Add the CSV file to the zip archive
-        zip_file.writestr('data.csv', csv_buffer.getvalue())
-
-        # Add the GIF file to the zip archive
-        zip_file.writestr('days.gif', gif_bytes.read())
-
-    # Seek to the beginning of the buffer
-    zip_buffer.seek(0)
-
-    # Set the response headers for the zip file
-    headers = {
-        "Content-Disposition": "attachment; filename=result.zip",
-        "Content-Type": "application/zip",
-    }
-
-    # Return the zip file as a response
-    return Response(content=zip_buffer.getvalue(), headers=headers)
