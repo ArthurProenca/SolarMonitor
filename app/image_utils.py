@@ -8,6 +8,10 @@ import scrapping
 
 reader = easyocr.Reader(['en'])
 
+def download_images(images, days_arr):
+    images = [scrapping.download_img(image) for image in images]
+    return images
+
 def download_and_preprocess_images(images, days_arr):
     images = [scrapping.download_img(image) for image in images]
     return [preprocess_image(image, day) for image, day in zip(images, days_arr)]

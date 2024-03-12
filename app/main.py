@@ -29,16 +29,27 @@ def download_and_preprocess_image(day):
     images = utils.get_solar_monitor_images(day)
     return image_utils.download_and_preprocess_images(images, [day])[0]
 
+def download_image(day):
+    day = datetime.strptime(day, "%Y-%m-%d")  # Convert day to datetime object
+    images = utils.get_solar_monitor_images(day)
+    return image_utils.download_images(images, [day])[0]
+
+
 @app.get("/solar-monitor/gif")
 def get_solar_monitor_gif_from_days(initial_date: str = Query(None),
                                     number_of_days: int = Query(0),
                                     sunspot: List[str] = Query(None),
-                                    download: bool = Query(False)):
+                                    download: bool = Query(False),
+                                    pre_process: bool = Query(True)):
     days_arr = utils.get_days_arr(initial_date, number_of_days)
 
     with ThreadPoolExecutor() as executor:
-        download_and_preprocess_partial = functools.partial(download_and_preprocess_image)
-        images = list(executor.map(download_and_preprocess_partial, days_arr))
+        if pre_process:
+            download_and_preprocess_partial = functools.partial(download_and_preprocess_image)
+            images = list(executor.map(download_and_preprocess_partial, days_arr))
+        else:
+            download_and_preprocess_partial = functools.partial(download_image)
+            images = list(executor.map(download_and_preprocess_partial, days_arr))
 
     if sunspot is not None:
         images = image_utils.highlight_text_in_images(images, sunspot)
