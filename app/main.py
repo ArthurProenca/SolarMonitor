@@ -62,6 +62,34 @@ def get_solar_monitor_gif_from_days(initial_date: str = Query(None),
         return response
     else:
         return StreamingResponse(gif_bytes, media_type="image/gif")
+    
+@app.get("/solar-monitor/jpeg")
+def get_solar_monitor_gif_from_days(date: str = Query(None),
+                                    sunspot: List[str] = Query(None),
+                                    download: bool = Query(False),
+                                    pre_process: bool = Query(False)):
+    days_arr = utils.get_days_arr(date, 0)
+
+    with ThreadPoolExecutor() as executor:
+        if pre_process:
+            download_and_preprocess_partial = functools.partial(download_and_preprocess_image)
+            images = list(executor.map(download_and_preprocess_partial, days_arr))
+        else:
+            download_and_preprocess_partial = functools.partial(download_image)
+            images = list(executor.map(download_and_preprocess_partial, days_arr))
+
+    if sunspot is not None:
+        images = image_utils.highlight_text_in_images(images, sunspot)
+    
+    image_bytes = image_utils.create_image(images)
+
+    if download:
+        response = StreamingResponse(image_bytes, media_type="image/jpeg")
+        filename = f"solar_monitor_{date}"
+        response.headers["Content-Disposition"] = 'attachment; filename=' + filename
+        return response
+    else:
+        return StreamingResponse(image_bytes, media_type="image/jpeg")
 
 
 

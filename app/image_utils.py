@@ -16,6 +16,12 @@ def download_and_preprocess_images(images, days_arr):
     images = [scrapping.download_img(image) for image in images]
     return [preprocess_image(image, day) for image, day in zip(images, days_arr)]
 
+def create_image(image):
+    image_bytes = io.BytesIO()
+    imageio.mimsave(image_bytes, image, format='jpeg')
+    image_bytes.seek(0)
+    return image_bytes
+
 def create_gif(images):
     gif_bytes = io.BytesIO()
     imageio.mimsave(gif_bytes, images, format='gif', fps=1, loop=0)

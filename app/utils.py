@@ -5,6 +5,8 @@ import csv
 from fastapi import  HTTPException
 
 def get_days_arr(initial_date, number_of_days):
+    if int(number_of_days) > 14:
+        raise HTTPException(status_code=400, detail="Number of days limit is 14.")
     if initial_date is None or number_of_days is None:
         raise HTTPException(status_code=400, detail="Both initial_date and number_of_days must be provided.")
 
