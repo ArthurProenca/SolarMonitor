@@ -8,3 +8,4 @@ opencv_python_headless==4.9.0.80
 Requests==2.31.0
 SQLAlchemy==2.0.28
 uvicorn==0.27.1
+psycopg2-binary==2.9.9
