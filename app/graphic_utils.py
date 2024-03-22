@@ -40,7 +40,7 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
             fitted_dates_original_format = mdates.num2date(fitted_dates)
 
             if do_adjustment:
-                plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (a={a:.2f})', linestyle='--')
+                plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (y={a:.2f}*x + b)', linestyle='--')
 
     plt.xlabel('Dia', fontsize=12)
     plt.ylabel('Longitude', fontsize=12)

@@ -6,7 +6,6 @@ import cv2
 import requests
 import numpy as np
 
-
 base_url = "https://www.solarmonitor.org"
 solar_monitor_url = base_url + "/full_disk.php?date={}&type=shmi_maglc&indexnum=1"
 

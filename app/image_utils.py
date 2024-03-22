@@ -4,17 +4,15 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import io
 import imageio
-import scrapping
 
 reader = easyocr.Reader(['en'])
 
-def download_images(images, days_arr):
-    images = [scrapping.download_img(image) for image in images]
-    return images
+def image_encode(img_data):
+    return cv2.imencode('.jpeg', img_data)[1].tobytes()
 
-def download_and_preprocess_images(images, days_arr):
-    images = [scrapping.download_img(image) for image in images]
-    return [preprocess_image(image, day) for image, day in zip(images, days_arr)]
+def image_decode(image):
+    image_array = np.frombuffer(image, dtype=np.uint8)
+    return cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
 def create_image(image):
     image_bytes = io.BytesIO()
