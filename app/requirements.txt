@@ -6,4 +6,5 @@ matplotlib==3.7.5
 numpy==1.24.4
 opencv_python_headless==4.9.0.80
 Requests==2.31.0
+SQLAlchemy==2.0.28
 uvicorn==0.27.1
