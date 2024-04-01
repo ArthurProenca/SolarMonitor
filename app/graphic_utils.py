@@ -44,7 +44,7 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
 
     plt.xlabel('Dia', fontsize=12)
     plt.ylabel('Longitude', fontsize=12)
-    plt.title(f'Gráfico de Dispersão e Reta de Ajuste: Longitude x Tempo para cada mancha solar entre {initial_date} e {final_date}', fontsize=14)
+    plt.title(f'Gráfico de Dispersão e Reta de Ajuste: Longitude x Tempo para mancha(s) solar(es) entre {initial_date} e {final_date}', fontsize=14)
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=10)
     plt.grid(True)
     plt.tight_layout()

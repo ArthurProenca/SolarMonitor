@@ -13,8 +13,15 @@ database = os.getenv('DB_NAME', 'postgres')
 # Montando a URL de conexão
 SQLALCHEMY_DATABASE_URL = f"postgresql://{username}:{password}@{host}:{port}/{database}"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
+# Definindo um gerenciador de contexto para a sessão
+class SessionManager:
+    def __enter__(self):
+        engine = create_engine(SQLALCHEMY_DATABASE_URL)
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=True)
+        self.session = SessionLocal()
+        return self.session
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.session.close()

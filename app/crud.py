@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
 from solar_monitor_cache import SolarMonitorCache
-from database import SessionLocal
 
 def save_data(db: Session, json_data: str, date: str, image_data: bytes):
     new_data = SolarMonitorCache(json_data=json_data, date=date, image=image_data)
