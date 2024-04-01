@@ -57,15 +57,13 @@ def save_and_get_solar_monitor_info_from_day(date):
     table_contents_aux = convert_table_contents_to_json(solar_monitor_info)
     json_data = []
     process_positions(table_contents_aux, json_data, [date])
-    json_data_str = json.dumps(json_data)
-
     formatted_date = datetime.datetime.strptime(date, "%Y-%m-%d")
     images = get_solar_monitor_images(formatted_date)
     image = download_images(images, [formatted_date])[0]
     image = image_encode(image)
-    database_service.save_data(json_data_str, date, image)
+    database_service.save_data(json_data, date, image)
     print(f"Date {date} not cached content")
-    return json_data_str, image
+    return json_data, image
 
     
 
