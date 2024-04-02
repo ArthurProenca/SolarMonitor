@@ -103,6 +103,6 @@ def get_images_to_gif(initial_date, number_of_days, sunspot, pre_process):
     for day in days_arr:
         _, image = get_content(day, pre_process)
         images.append(image)
-    images = image_utils.highlight_text_in_images(images, sunspot)
+    #images = image_utils.highlight_text_in_images(images, sunspot)
     gif_bytes = image_utils.create_gif(images)
     return gif_bytes
