@@ -17,8 +17,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/solar-monitor/jpeg")
-def get_solar_monitor_gif_from_days(date: str = Query(None),
+@app.get("/api/v1/solar-monitor/jpeg")
+def get_solar_monitor_jpeg_from_date(date: str = Query(None),
                                     download: bool = Query(False),
                                     pre_process: bool = Query(False)):
 
@@ -37,15 +37,21 @@ def get_solar_monitor_gif_from_days(date: str = Query(None),
         return StreamingResponse(image_bytes, media_type="image/jpeg")
 
 
-@app.get("/solar-monitor/gif")
-def get_solar_monitor_gif_from_days(initial_date: str = Query(None),
-                                    number_of_days: int = Query(0),
-                                    sunspot: List[str] = Query(None),
-                                    download: bool = Query(False),
-                                    pre_process: bool = Query(False)):
-    gif_bytes = get_images_to_gif(
-        initial_date, number_of_days, sunspot, pre_process)
-
+@app.get("/api/v1/solar-monitor/sunspots/gif")
+def get_solar_monitor_spot_info(
+        date: str = Query(None),
+        sunspots: List[str] = Query(None),
+        download: bool = Query(False)
+):
+    initial_date, final_date, full_content = utils.sunspot_backtracking(
+        date, sunspots)
+    
+    days_arr = list(full_content.keys())
+    days_arr.reverse()
+    
+    gif_bytes = get_images_to_gif(initial_date, utils.how_many_days_between(
+            initial_date, final_date), sunspots, True)
+    
     if download:
         response = StreamingResponse(gif_bytes, media_type="image/gif")
         response.headers["Content-Disposition"] = 'attachment; filename="solar_monitor.gif"'
@@ -53,14 +59,11 @@ def get_solar_monitor_gif_from_days(initial_date: str = Query(None),
     else:
         return StreamingResponse(gif_bytes, media_type="image/gif")
 
-
-@app.get("/solar-monitor/spot")
+@app.get("/api/v1/solar-monitor/sunspots")
 def get_solar_monitor_spot_info(
         date: str = Query(None),
         sunspots: List[str] = Query(None),
-        do_adjustment: bool = Query(True),
-        make_gif: bool = Query(False),
-        pre_process: bool = Query(False),
+        linear_adjustment: bool = Query(True),
         download: bool = Query(False)
 ):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
@@ -72,22 +75,18 @@ def get_solar_monitor_spot_info(
     full_content = utils.data_equalizer(full_content)
 
     img_bytes = io.BytesIO()
-    
-    if make_gif:
-        gif_bytes = get_images_to_gif(initial_date, utils.how_many_days_between(
-            initial_date, final_date), sunspots, pre_process)
-        if download:
-            response = StreamingResponse(gif_bytes, media_type="image/gif")
-            response.headers["Content-Disposition"] = 'attachment; filename="solar_monitor.gif"'
-            return response
-        else:
-            return StreamingResponse(gif_bytes, media_type="image/gif")
 
     graphic_utils.create_graphic(
-        full_content, img_bytes, initial_date, final_date, do_adjustment)
-
+        full_content, img_bytes, initial_date, final_date, linear_adjustment)
+    
     img_bytes.seek(0)
-    return StreamingResponse(img_bytes, media_type="image/png")
+
+    if download:
+        response = StreamingResponse(img_bytes, media_type="image/jpeg")
+        response.headers["Content-Disposition"] = 'attachment; filename="solar_monitor.jpeg"'
+        return response
+
+    return StreamingResponse(img_bytes, media_type="image/jpeg")
 
 
 def get_content(day, pre_process):
@@ -104,6 +103,6 @@ def get_images_to_gif(initial_date, number_of_days, sunspot, pre_process):
     for day in days_arr:
         _, image = get_content(day, pre_process)
         images.append(image)
-
+    images = image_utils.highlight_text_in_images(images, sunspot)
     gif_bytes = image_utils.create_gif(images)
     return gif_bytes

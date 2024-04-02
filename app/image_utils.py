@@ -1,11 +1,8 @@
 import easyocr
 import cv2
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 import io
 import imageio
-
-reader = easyocr.Reader(['en'])
 
 def image_encode(img_data):
     return cv2.imencode('.jpeg', img_data)[1].tobytes()
@@ -26,34 +23,46 @@ def create_gif(images):
     gif_bytes.seek(0)
     return gif_bytes
 
+class EasyOCRReader:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.reader = easyocr.Reader(['en'])
+        return cls._instance
+
+def highlight_text_in_image(image, texts, easyocr_reader):
+    # Convert the image to a NumPy array
+    image_np = np.array(image)
+
+    # Convert the image to a format compatible with EasyOCR
+    image_np_rgb = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+
+    # Extract the text from the image using EasyOCR
+    result = easyocr_reader.reader.readtext(image_np_rgb)
+
+    # Highlight the specified text
+    for detection in result:
+        detected_text = detection[1]
+        for text in texts:
+            if text in detected_text:
+                # Highlight the text in the original image
+                bbox = detection[0]
+                cv2.rectangle(image_np_rgb, tuple(map(int, bbox[0])), tuple(map(int, bbox[2])), (0, 255, 0), 2)
+
+    # Convert the image back to the original format
+    image_highlighted = cv2.cvtColor(image_np_rgb, cv2.COLOR_RGB2BGR)
+    return image_highlighted
+
 def highlight_text_in_images(images, texts):
-    def process_image(image):
-        # Convert the image to a NumPy array
-        image_np = np.array(image)
+    # Create an instance of EasyOCRReader
+    easyocr_reader = EasyOCRReader()
 
-        # Convert the image to a format compatible with EasyOCR
-        image_np_rgb = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
-
-        # Extract the text from the image using EasyOCR
-        result = reader.readtext(image_np_rgb)
-
-        # Highlight the specified text
-        for detection in result:
-            detected_text = detection[1]
-            for text in texts:
-                if text in detected_text:
-                    # Highlight the text in the original image
-                    bbox = detection[0]
-                    cv2.rectangle(image_np_rgb, tuple(map(int, bbox[0])), tuple(map(int, bbox[2])), (0, 255, 0), 2)
-
-        # Convert the image back to the original format
-        image = cv2.cvtColor(image_np_rgb, cv2.COLOR_RGB2BGR)
-        return image
-
-    # Use ThreadPoolExecutor for parallel processing
-    with ThreadPoolExecutor() as executor:
-        processed_images = list(executor.map(process_image, images))
-
+    processed_images = []
+    for image in images:
+        processed_images.append(highlight_text_in_image(image, texts, easyocr_reader))
+    
     return processed_images
 
 def preprocess_image(image, day):
