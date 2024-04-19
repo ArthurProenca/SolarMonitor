@@ -2,13 +2,15 @@ import datetime
 import scrapping
 import json
 from fastapi import  HTTPException
-import database_service
 import json
 import scrapping
 from image_utils import image_encode
+from memory_cache import SimpleMemoryCache
+
+simple_memory_cache = SimpleMemoryCache(300)
 
 def sunspot_backtracking(initial_date, sunspots):
-    content, _ = save_and_get_solar_monitor_info_from_day(initial_date)
+    content, _ = cache_and_get_solar_monitor_info_from_day(initial_date)
     right_half = get_negative_days_arr(initial_date, 0)
     left_half = get_positive_days_arr(initial_date, 0)
     full_content = {}
@@ -19,9 +21,9 @@ def sunspot_backtracking(initial_date, sunspots):
         if matching_content == []:
             break
         right_half = get_negative_days_arr(right_half, 1)
-        content, _ = save_and_get_solar_monitor_info_from_day(right_half)
+        content, _ = cache_and_get_solar_monitor_info_from_day(right_half)
 
-    content, _ = save_and_get_solar_monitor_info_from_day(initial_date)  # Reinicia o conteúdo para a data inicial
+    content, _ = cache_and_get_solar_monitor_info_from_day(initial_date)  # Reinicia o conteúdo para a data inicial
 
     while True:
         matching_content = is_sunspot_on(sunspots, content)
@@ -29,7 +31,7 @@ def sunspot_backtracking(initial_date, sunspots):
         if matching_content == []:
             break
         left_half = get_positive_days_arr(left_half, 1)
-        content, _ = save_and_get_solar_monitor_info_from_day(left_half)
+        content, _ = cache_and_get_solar_monitor_info_from_day(left_half)
     
     return right_half, left_half, full_content
         
@@ -47,11 +49,13 @@ def download_images(images, days_arr):
     images = [scrapping.download_img(image) for image in images]
     return images
 
-def save_and_get_solar_monitor_info_from_day(date):
-    cached_content = database_service.get_by_date(date)
-    if cached_content is not None:
-        print(f"Date {date} cached content")
-        return cached_content.json_data, cached_content.image
+def cache_and_get_solar_monitor_info_from_day(date):
+    json_cache_key, image_cache_key = f"{date}_json", f"{date}_img"
+    cached_json_data = simple_memory_cache.get(json_cache_key)
+    cached_img_data = simple_memory_cache.get(image_cache_key)
+
+    if cached_json_data is not None and cached_img_data is not None:
+        return cached_json_data, cached_img_data
     
     solar_monitor_info = get_solar_monitor_info([date])
     table_contents_aux = convert_table_contents_to_json(solar_monitor_info)
@@ -61,8 +65,8 @@ def save_and_get_solar_monitor_info_from_day(date):
     images = get_solar_monitor_images(formatted_date)
     image = download_images(images, [formatted_date])[0]
     image = image_encode(image)
-    database_service.save_data(json_data, date, image)
-    print(f"Date {date} not cached content")
+    simple_memory_cache.put(json_cache_key, json_data)
+    simple_memory_cache.put(image_cache_key, image)
     return json_data, image
 
     
