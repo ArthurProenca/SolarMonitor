@@ -90,7 +90,7 @@ def get_solar_monitor_spot_info(
 
 
 def get_content(day, pre_process):
-    content, images = utils.save_and_get_solar_monitor_info_from_day(day)
+    content, images = utils.cache_and_get_solar_monitor_info_from_day(day)
     image = image_utils.image_decode(images)
     if pre_process:
         return content, image_utils.preprocess_image(image, day)
