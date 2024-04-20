@@ -6,8 +6,21 @@ import json
 import scrapping
 from image_utils import image_encode
 from memory_cache import SimpleMemoryCache
+import io
+import csv
+import tempfile
+from tabulate import tabulate
 
-simple_memory_cache = SimpleMemoryCache(300)
+#1h memory cache
+simple_memory_cache = SimpleMemoryCache(3600)
+
+def date_sanity_check(date_obj):
+    date_obj = datetime.datetime.strptime(date_obj, "%Y-%m-%d").date()
+
+    today = datetime.datetime.now().date()
+    if date_obj > today:
+        return None
+    return date_obj
 
 def sunspot_backtracking(initial_date, sunspots):
     content, _ = cache_and_get_solar_monitor_info_from_day(initial_date)
@@ -19,6 +32,7 @@ def sunspot_backtracking(initial_date, sunspots):
         matching_content = is_sunspot_on(sunspots, content)
         full_content[right_half] = matching_content
         if matching_content == []:
+            right_half = get_positive_days_arr(right_half, 1)
             break
         right_half = get_negative_days_arr(right_half, 1)
         content, _ = cache_and_get_solar_monitor_info_from_day(right_half)
@@ -29,13 +43,73 @@ def sunspot_backtracking(initial_date, sunspots):
         matching_content = is_sunspot_on(sunspots, content)
         full_content[left_half] = matching_content
         if matching_content == []:
+            left_half = get_negative_days_arr(left_half, 1)
             break
         left_half = get_positive_days_arr(left_half, 1)
+        if date_sanity_check(left_half) is None:
+            left_half = get_negative_days_arr(left_half, 1)
+            break
         content, _ = cache_and_get_solar_monitor_info_from_day(left_half)
     
     return right_half, left_half, full_content
         
 
+def create_text_table(content, bytes_io):
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        # Prepare the data for tabulate
+        table_data = []
+        for item in content:
+            noaa_number = item['noaaNumber']
+            positions = item['latestPositions']
+            for pos in positions:
+                position = pos['position']
+                day = pos['day']
+                x_coordinate = pos['x_coordinate']
+                y_coordinate = pos['y_coordinate']
+                longitude = pos['longitude']
+                latitude = pos['latitude']
+                if ([noaa_number, position, day, x_coordinate, y_coordinate, longitude, latitude]) not in table_data:
+                    table_data.append([noaa_number, position, day, x_coordinate, y_coordinate, longitude, latitude])
+
+        # Generate the table using tabulate
+        table = tabulate(table_data, headers=["Mancha", "Posição", "Dia", "Coordenada X", "Coordenada Y", "Longitude", "Latitude"], tablefmt="plain")
+
+        # Write the formatted table to the temporary file
+        with open(temp_file.name, 'w', encoding='utf-8') as f:
+            f.write(table)
+
+        # Copy the content to BytesIO
+        with open(temp_file.name, 'rb') as file:
+            bytes_io.write(file.read())
+
+def create_csv(full_content, bytes_io):
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        with io.TextIOWrapper(temp_file, newline='', write_through=True) as csv_file:
+            # Set CSV file headers
+            fieldnames = ['Mancha', 'Posição', 'Dia', 'Coordenada X', 'Coordenada Y', 'Longitude', 'Latitude']
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+
+            # Write headers to the CSV file
+            writer.writeheader()
+
+            # Iterate over the data and write each line to the CSV file
+            for item in full_content:
+                noaa_number = item['noaaNumber']
+                positions = item['latestPositions']
+                for pos in positions:
+                    writer.writerow({
+                        'Mancha': noaa_number,
+                        'Posição': pos['position'],
+                        'Dia': pos['day'],
+                        'Coordenada X': pos['x_coordinate'],
+                        'Coordenada Y': pos['y_coordinate'],
+                        'Longitude': pos['longitude'],
+                        'Latitude': pos['latitude']
+                    })
+
+        # Copy the content to BytesIO
+        with open(temp_file.name, 'rb') as file:
+            bytes_io.write(file.read())
 
 
 def is_sunspot_on(sunspots, table_contents):
