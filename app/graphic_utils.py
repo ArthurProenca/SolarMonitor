@@ -9,6 +9,10 @@ def medium(list_aux):
         return 0
     return sum(list_aux) / len(list_aux)
 
+def date_format(data, pattern):
+    data_obj = datetime.strptime(data, "%Y-%m-%d")
+    date_formatted = data_obj.strftime(pattern)
+    return date_formatted
 
 def extract_x_value(position):
     # Extrai o valor 'x' da posição no formato cddcdd(xxx, -yyy)
@@ -27,10 +31,9 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
         longitudes = [pos['longitude'] for pos in positions]
         latitudes = [pos['latitude'] for pos in positions]
 
-
         # Check if there are enough points for linear regression
         if len(dates) >= 2:
-            plt.scatter(dates, longitudes, label=f'Mancha {noaa_number}, latitude média: {medium(latitudes):.2f}', s=50, alpha=0.7)  # Add transparency for better visibility
+            plt.scatter(dates, longitudes, label=f'Mancha {noaa_number}, latitude média: {np.mean(latitudes):.2f}', s=50, alpha=0.7)  # Add transparency for better visibility
             
             x_values = mdates.date2num(dates)
             coefficients = np.polyfit(x_values, longitudes, 1)
@@ -44,7 +47,7 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
 
     plt.xlabel('Dia', fontsize=12)
     plt.ylabel('Longitude', fontsize=12)
-    plt.title(f'Gráfico de Dispersão e Reta de Ajuste: Longitude x Tempo para mancha(s) solar(es) entre {initial_date} e {final_date}', fontsize=14)
+    plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=14)
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=10)
     plt.grid(True)
     plt.tight_layout()
@@ -52,7 +55,7 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
     plt.subplots_adjust(left=0.1, right=0.85, top=0.85, bottom=0.1)  # Adjust the top margin
 
     plt.gca().xaxis.set_major_locator(mdates.DayLocator())
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))  # Format x-axis dates
     
     plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better readability
 
