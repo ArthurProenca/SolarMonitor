@@ -10,8 +10,32 @@ def medium(list_aux):
     return sum(list_aux) / len(list_aux)
 
 def date_format(data, pattern):
+    # Mapeamento de meses em inglês para português
+    months_translation = {
+        'Jan': 'Jan',
+        'Feb': 'Fev',
+        'Mar': 'Mar',
+        'Apr': 'Abr',
+        'May': 'Mai',
+        'Jun': 'Jun',
+        'Jul': 'Jul',
+        'Aug': 'Ago',
+        'Sep': 'Set',
+        'Oct': 'Out',
+        'Nov': 'Nov',
+        'Dec': 'Dez'
+    }
+
+    # Converter a data para um objeto datetime
     data_obj = datetime.strptime(data, "%Y-%m-%d")
+
+    # Formatar a data conforme o padrão fornecido
     date_formatted = data_obj.strftime(pattern)
+
+    # Substituir os nomes dos meses em inglês pelos nomes em português
+    for month_en, month_pt in months_translation.items():
+        date_formatted = date_formatted.replace(month_en, month_pt)
+
     return date_formatted
 
 def extract_x_value(position):
@@ -45,7 +69,7 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
             if do_adjustment:
                 plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (y={a:.2f}*x + b)', linestyle='--')
 
-    plt.xlabel('Dia', fontsize=12)
+    plt.xlabel('Dia, formato (dd/mm/yyyy)', fontsize=12)
     plt.ylabel('Longitude', fontsize=12)
     plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=14)
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=10)

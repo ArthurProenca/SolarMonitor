@@ -10,14 +10,17 @@ import io
 import csv
 import tempfile
 from tabulate import tabulate
+import pytz
+
+tz = pytz.timezone('America/Sao_Paulo')
 
 #1h memory cache
-simple_memory_cache = SimpleMemoryCache(3600)
+simple_memory_cache = SimpleMemoryCache(360)
 
 def date_sanity_check(date_obj):
     date_obj = datetime.datetime.strptime(date_obj, "%Y-%m-%d").date()
 
-    today = datetime.datetime.now().date()
+    today = datetime.datetime.now(tz).date()
     if date_obj > today:
         return None
     return date_obj
