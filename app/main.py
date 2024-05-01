@@ -130,6 +130,7 @@ def get_content(day, pre_process):
     content, images = utils.cache_and_get_solar_monitor_info_from_day(day)
     image = image_utils.image_decode(images)
     if pre_process:
+        day = graphic_utils.date_format(day, "%d de %b. de %Y")
         return content, image_utils.preprocess_image(image, day)
     return content, image
 

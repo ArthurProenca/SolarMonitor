@@ -11,15 +11,15 @@ solar_monitor_url = base_url + "/full_disk.php?date={}&type=shmi_maglc&indexnum=
 
 def get_x_coordinate(coordinates_match):
     if coordinates_match[0] == "N":
-        return "-" + coordinates_match[1:3]
-    else:
         return coordinates_match[1:3]
+    else:
+        return "-" + coordinates_match[1:3]
     
 def get_y_coordinate(coordinates_match):
     if coordinates_match[3] == "E":
-        return "-" + coordinates_match[4:6]
-    else:
         return coordinates_match[4:6]
+    else:
+        return "-" + coordinates_match[4:6]
 
 def get_html(url):
     return requests.get(url)

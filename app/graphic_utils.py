@@ -69,8 +69,8 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
             if do_adjustment:
                 plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (y={a:.2f}*x + b)', linestyle='--')
 
-    plt.xlabel('Dia, formato (dd/mm/yyyy)', fontsize=12)
-    plt.ylabel('Longitude', fontsize=12)
+    plt.xlabel('Data', fontsize=12)
+    plt.ylabel('Longitude (°)', fontsize=12)
     plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=14)
     plt.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=10)
     plt.grid(True)
@@ -82,6 +82,8 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))  # Format x-axis dates
     
     plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better readability
+
+    plt.text(0.95, 0.01, 'Fonte: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=10, ha='right', va='bottom')  # Move source text to bottom right
 
     plt.savefig(img_bytes, format='png', bbox_inches='tight')  # Use bbox_inches='tight' to include the legend
     plt.close()
