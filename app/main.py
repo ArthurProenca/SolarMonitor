@@ -42,7 +42,8 @@ def get_solar_monitor_jpeg_from_date(date: str = Query(None),
 def get_solar_monitor_spot_info(
         date: str = Query(None),
         sunspots: List[str] = Query(None),
-        download: bool = Query(False)
+        download: bool = Query(False),
+        ocr: bool = Query(False)
 ):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
         date, sunspots)
@@ -51,7 +52,7 @@ def get_solar_monitor_spot_info(
     days_arr.reverse()
     
     gif_bytes = get_images_to_gif(initial_date, utils.how_many_days_between(
-            initial_date, final_date), sunspots, True)
+            initial_date, final_date), sunspots, True, ocr)
     
     if download:
         response = StreamingResponse(gif_bytes, media_type="image/gif")
@@ -134,13 +135,14 @@ def get_content(day, pre_process):
         return content, image_utils.preprocess_image(image, day)
     return content, image
 
-def get_images_to_gif(initial_date, number_of_days, sunspot, pre_process):
+def get_images_to_gif(initial_date, number_of_days, sunspot, pre_process, ocr):
     days_arr = utils.get_days_arr(initial_date, number_of_days)
     images = []
 
     for day in days_arr:
         _, image = get_content(day, pre_process)
         images.append(image)
-    #images = image_utils.highlight_text_in_images(images, sunspot)
+    if ocr:
+        images = image_utils.highlight_text_in_images(images, sunspot)
     gif_bytes = image_utils.create_gif(images)
     return gif_bytes
