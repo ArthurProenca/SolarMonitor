@@ -44,20 +44,20 @@ def extract_x_value(position):
     return int(x_value)
 
 def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
-    plt.figure(figsize=(18, 8))  # Adjust the height of the figure
+    plt.figure(figsize=(12, 8))  # Ajuste o tamanho da figura
 
     for entry in result:
         noaa_number = entry['noaaNumber']
         positions = entry['latestPositions']
         
-        # Extract information for the graph
+        # Extrair informações para o gráfico
         dates = [datetime.strptime(pos['day'], '%Y-%m-%d') for pos in positions]
         longitudes = [pos['longitude'] for pos in positions]
         latitudes = [pos['latitude'] for pos in positions]
 
-        # Check if there are enough points for linear regression
+        # Verificar se há pontos suficientes para regressão linear
         if len(dates) >= 2:
-            plt.scatter(dates, longitudes, label=f'Mancha {noaa_number}, latitude média: {np.mean(latitudes):.2f}', s=50, alpha=0.7)  # Add transparency for better visibility
+            plt.scatter(dates, longitudes, label=f'Mancha {noaa_number}, latitude média: {np.mean(latitudes):.2f}', s=100, alpha=0.7)  # Ajuste o tamanho e a transparência dos pontos
             
             x_values = mdates.date2num(dates)
             coefficients = np.polyfit(x_values, longitudes, 1)
@@ -67,23 +67,23 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
             fitted_dates_original_format = mdates.num2date(fitted_dates)
 
             if do_adjustment:
-                plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (y={a:.2f}*x + b)', linestyle='--')
+                plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste Mancha {noaa_number} (y={a:.2f}*x + b)', linestyle='--', linewidth=2)  # Ajuste o estilo e a largura da linha
 
-    plt.xlabel('Data', fontsize=12)
+    plt.xlabel('Data (formato dd/mm/yyyy)', fontsize=12)
     plt.ylabel('Longitude (°)', fontsize=12)
     plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=14)
-    plt.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=10)
-    plt.grid(True)
+    plt.legend(loc='best', fontsize=10)  # Ajuste a posição da legenda
+    plt.grid(True, linestyle='--', linewidth=0.5)  # Adicione um grid mais claro
     plt.tight_layout()
 
-    plt.subplots_adjust(left=0.1, right=0.85, top=0.85, bottom=0.1)  # Adjust the top margin
+    plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.15)  # Ajuste as margens
 
     plt.gca().xaxis.set_major_locator(mdates.DayLocator())
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))  # Format x-axis dates
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))  # Formatar datas do eixo x
     
-    plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better readability
+    plt.xticks(rotation=45, ha='right')  # Rotacionar rótulos do eixo x
 
-    plt.text(0.95, 0.01, 'Fonte: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=10, ha='right', va='bottom')  # Move source text to bottom right
+    plt.text(0.95, 0.01, 'Fonte: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=10, ha='right', va='bottom')  # Mover texto da fonte para o canto inferior direito
 
-    plt.savefig(img_bytes, format='png', bbox_inches='tight')  # Use bbox_inches='tight' to include the legend
+    plt.savefig(img_bytes, format='png', bbox_inches='tight')  # Use bbox_inches='tight' para incluir a legenda
     plt.close()
