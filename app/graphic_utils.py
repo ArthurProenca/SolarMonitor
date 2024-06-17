@@ -44,7 +44,7 @@ def extract_x_value(position):
     return int(x_value)
 
 def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
-    plt.figure(figsize=(12, 8))  # Ajuste o tamanho da figura
+    plt.figure(figsize=(11, 7))  # Aumentar o tamanho da figura para melhor visualização
 
     for entry in result:
         noaa_number = entry['noaaNumber']
@@ -67,23 +67,21 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
             fitted_dates_original_format = mdates.num2date(fitted_dates)
 
             if do_adjustment:
-                plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste Mancha {noaa_number} (y={a:.2f}*x + b)', linestyle='--', linewidth=2)  # Ajuste o estilo e a largura da linha
+                plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (y={a:.2f}x + b)', linestyle='--', linewidth=2)  # Ajuste o estilo e a largura da linha
 
-    plt.xlabel('Data (formato dd/mm/yyyy)', fontsize=12)
-    plt.ylabel('Longitude (°)', fontsize=12)
-    plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=14)
-    plt.legend(loc='best', fontsize=10)  # Ajuste a posição da legenda
+    plt.xlabel('Data (formato dd/mm/yyyy)', fontsize=14)
+    plt.ylabel('Longitude (°)', fontsize=14)
+    plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=11)
+    plt.legend(loc='best', fontsize=12)  # Ajuste a posição e o tamanho da legenda
     plt.grid(True, linestyle='--', linewidth=0.5)  # Adicione um grid mais claro
     plt.tight_layout()
 
-    plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.15)  # Ajuste as margens
-
-    plt.gca().xaxis.set_major_locator(mdates.DayLocator())
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=1))  # Marcar todos os dias no eixo x
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))  # Formatar datas do eixo x
     
-    plt.xticks(rotation=45, ha='right')  # Rotacionar rótulos do eixo x
+    plt.xticks(rotation=45, ha='right', fontsize=12)  # Rotacionar rótulos do eixo x e aumentar o tamanho da fonte
 
-    plt.text(0.95, 0.01, 'Fonte: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=10, ha='right', va='bottom')  # Mover texto da fonte para o canto inferior direito
+    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=12, ha='right', va='bottom')  # Mover texto da fonte para o canto inferior direito
 
     plt.savefig(img_bytes, format='png', bbox_inches='tight')  # Use bbox_inches='tight' para incluir a legenda
     plt.close()
