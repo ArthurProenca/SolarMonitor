@@ -69,7 +69,7 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
             if do_adjustment:
                 plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (y={a:.2f}x + b)', linestyle='--', linewidth=2)  # Ajuste o estilo e a largura da linha
 
-    plt.xlabel('Data (formato dd/mm/yyyy)', fontsize=14)
+    plt.xlabel('Data (formato dd/mm/yy)', fontsize=14)
     plt.ylabel('Longitude (°)', fontsize=14)
     plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=11)
     plt.legend(loc='best', fontsize=12)  # Ajuste a posição e o tamanho da legenda
