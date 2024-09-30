@@ -63,8 +63,7 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
 
         # Verificar se há pontos suficientes para regressão linear
         if len(dates) >= 2:
-            plt.scatter(dates, longitudes, label=f'Mancha {noaa_number}, latitude média: {np.mean(
-                latitudes):.2f}', s=100, alpha=0.7)  # Ajuste o tamanho e a transparência dos pontos
+            plt.scatter(dates, longitudes, label=f'Mancha {noaa_number}, latitude média: {np.mean(latitudes):.2f}', s=100, alpha=0.7)  # Ajuste o tamanho e a transparência dos pontos
 
             x_values = mdates.date2num(dates)
             coefficients = np.polyfit(x_values, longitudes, 1)
