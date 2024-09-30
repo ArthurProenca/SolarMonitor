@@ -77,25 +77,20 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
 
     plt.xlabel('Data (formato dd/mm/yy)', fontsize=14)
     plt.ylabel('Longitude (°)', fontsize=14)
-    plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(
-        initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=11)
+    plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=11)
     # Ajuste a posição e o tamanho da legenda
     plt.legend(loc='best', fontsize=12)
     # Adicione um grid mais claro
     plt.grid(True, linestyle='--', linewidth=0.5)
     plt.tight_layout()
 
-    plt.gca().xaxis.set_major_locator(mdates.DayLocator(
-        interval=1))  # Marcar todos os dias no eixo x
-    plt.gca().xaxis.set_major_formatter(
-        mdates.DateFormatter('%d/%m/%y'))  # Formatar datas do eixo x
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=1))  # Marcar todos os dias no eixo x
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))  # Formatar datas do eixo x
 
     # Rotacionar rótulos do eixo x e aumentar o tamanho da fonte
     plt.xticks(rotation=45, ha='right', fontsize=12)
 
-    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes,
-             # Mover texto da fonte para o canto inferior direito
-             fontsize=12, ha='right', va='bottom')
+    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes,fontsize=12, ha='right', va='bottom')
 
     # Use bbox_inches='tight' para incluir a legenda
     plt.savefig(img_bytes, format='png', bbox_inches='tight')
@@ -147,10 +142,9 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
     # Ajustar o título do gráfico com base no search_type
     title_period = "mensal" if search_type == 'MONTHLY' else "anual"
     if search_type == 'MONTHLY':
-        title = f'Gráfico {title_period}: Número de manchas entre {date_format(
-            initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}'
+        title = f'Gráfico {title_period}: Número de manchas entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}'
     else:
-        title = f'Gráfico {title_period}: Número de manchas entre {periods[0]} e {periods1[-1]}'
+        title = f'Gráfico {title_period}: Número de manchas entre {periods[0]} e {periods[-1]}'
     plt.title(title, fontsize=14)
     
     plt.grid(True, linestyle='--', linewidth=0.5)
@@ -164,8 +158,7 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
 
     plt.xticks(rotation=45, ha='right', fontsize=12)
 
-    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org',
-             transform=plt.gca().transAxes, fontsize=12)
+    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org',transform=plt.gca().transAxes, fontsize=12)
 
     # Ajustar o espaçamento para evitar que o gráfico seja cortado
     plt.subplots_adjust(left=0.08, right=0.95, top=0.92, bottom=0.1)
