@@ -60,7 +60,8 @@ def get_table_content_from_date(year, month, day):
                 "McIntosh Class": cells[3].text.strip(),
                 "Sunspot Area [millionths]": cells[4].text.strip(),
                 "Number of Spots": cells[5].text.strip(),
-                "Recent Flares": [link.text.strip() for link in cells[6].find_all('a')]
+                "Recent Flares": [link.text.strip() for link in cells[6].find_all('a')],
+                "Date": f"{year}-{month}-{day}"
             }
             data.append(entry)
 

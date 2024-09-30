@@ -18,10 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/api/v1/solar-monitor/jpeg")
 def get_solar_monitor_jpeg_from_date(date: str = Query(None),
-                                    download: bool = Query(False),
-                                    pre_process: bool = Query(False)):
+                                     download: bool = Query(False),
+                                     pre_process: bool = Query(False)):
 
     days_arr = utils.get_days_arr(date, 0)
 
@@ -47,19 +48,41 @@ def get_solar_monitor_spot_info(
 ):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
         date, sunspots)
-    
+
     days_arr = list(full_content.keys())
     days_arr.reverse()
-    
+
     gif_bytes = get_images_to_gif(initial_date, utils.how_many_days_between(
-            initial_date, final_date), sunspots, True, ocr)
-    
+        initial_date, final_date), sunspots, True, ocr)
+
     if download:
         response = StreamingResponse(gif_bytes, media_type="image/gif")
         response.headers["Content-Disposition"] = 'attachment; filename="solar_monitor.gif"'
         return response
     else:
         return StreamingResponse(gif_bytes, media_type="image/gif")
+
+
+@app.get("/api/v1/solar-monitor/sunspots-amount")
+def get_solar_monitor_sunspots_amount(search_type=Query("MONTHLY"),
+                                      initial_date=Query(None),
+                                      final_date=Query(None)):
+    full_content = {}
+    count = 0
+    dates = utils.get_days_arr_between_dates(initial_date, final_date, search_type)
+
+    for date in dates:
+        full_content[count] = utils.cache_and_get_solar_monitor_info_from_day_without_image(
+            date)
+        count += 1
+
+    full_content = utils.data_equalizer(full_content)
+    img_bytes = io.BytesIO()
+    graphic_utils.create_sunspots_amount_graphic(full_content, img_bytes, initial_date, final_date, search_type)
+    full_content = {}
+    img_bytes.seek(0)
+    return StreamingResponse(img_bytes, media_type="image/jpeg")
+
 
 @app.get("/api/v1/solar-monitor/sunspots")
 def get_solar_monitor_spot_info(
@@ -70,7 +93,7 @@ def get_solar_monitor_spot_info(
 ):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
         date, sunspots)
-    
+
     days_arr = list(full_content.keys())
     days_arr.reverse()
 
@@ -80,7 +103,7 @@ def get_solar_monitor_spot_info(
 
     graphic_utils.create_graphic(
         full_content, img_bytes, initial_date, final_date, linear_adjustment)
-    
+
     img_bytes.seek(0)
 
     if download:
@@ -90,9 +113,11 @@ def get_solar_monitor_spot_info(
 
     return StreamingResponse(img_bytes, media_type="image/jpeg")
 
+
 @app.get("/api/v1/solar-monitor/sunspots/zip")
 def get_raw_content(date: str = Query(None), sunspots: List[str] = Query(None)):
-    initial_date, final_date, full_content = utils.sunspot_backtracking(date, sunspots)
+    initial_date, final_date, full_content = utils.sunspot_backtracking(
+        date, sunspots)
 
     days_arr = list(full_content.keys())
     days_arr.reverse()
@@ -108,7 +133,7 @@ def get_raw_content(date: str = Query(None), sunspots: List[str] = Query(None)):
 
     graphic_utils.create_graphic(
         full_content, img_bytes, initial_date, final_date, False)
-    
+
     img_bytes.seek(0)
     utils.create_text_table(full_content, table_bytes)
     utils.create_csv(full_content, csv_bytes)
@@ -127,6 +152,7 @@ def get_raw_content(date: str = Query(None), sunspots: List[str] = Query(None)):
 
     return response
 
+
 def get_content(day, pre_process):
     content, images = utils.cache_and_get_solar_monitor_info_from_day(day)
     image = image_utils.image_decode(images)
@@ -134,6 +160,7 @@ def get_content(day, pre_process):
         day = graphic_utils.date_format(day, "%d de %b. de %Y")
         return content, image_utils.preprocess_image(image, day)
     return content, image
+
 
 def get_images_to_gif(initial_date, number_of_days, sunspot, pre_process, ocr):
     days_arr = utils.get_days_arr(initial_date, number_of_days)
