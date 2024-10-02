@@ -6,16 +6,14 @@ import calendar
 import json
 import scrapping
 from image_utils import image_encode
-from memory_cache import SimpleMemoryCache
 import io
 import csv
 import tempfile
 from tabulate import tabulate
 import pytz
+from sunspots_database_dao import SunspotsDatabaseDao
 
-
-# 5min memory cache
-simple_memory_cache = SimpleMemoryCache(360)
+db_dao = SunspotsDatabaseDao()
 
 
 def date_sanity_check(date_obj):
@@ -137,9 +135,7 @@ def download_images(images, days_arr):
 
 
 def cache_and_get_solar_monitor_info_from_day(date):
-    json_cache_key, image_cache_key = f"{date}_json", f"{date}_img"
-    cached_json_data = simple_memory_cache.get(json_cache_key)
-    cached_img_data = simple_memory_cache.get(image_cache_key)
+    cached_json_data, cached_img_data = db_dao.fetch_data_by_date(date)
 
     if cached_json_data is not None and cached_img_data is not None:
         return cached_json_data, cached_img_data
@@ -152,24 +148,8 @@ def cache_and_get_solar_monitor_info_from_day(date):
     images = get_solar_monitor_images(formatted_date)
     image = download_images(images, [formatted_date])[0]
     image = image_encode(image)
-    simple_memory_cache.put(json_cache_key, json_data)
-    simple_memory_cache.put(image_cache_key, image)
+    db_dao.insert_data(date, json_data, image)
     return json_data, image
-
-
-def cache_and_get_solar_monitor_info_from_day_without_image(date):
-    json_cache_key = f"{date}_json"
-    cached_json_data = simple_memory_cache.get(json_cache_key)
-
-    if cached_json_data is not None:
-        return cached_json_data
-
-    solar_monitor_info = get_solar_monitor_info([date])
-    table_contents_aux = convert_table_contents_to_json(solar_monitor_info)
-    json_data = []
-    process_positions(table_contents_aux, json_data, [date])
-    simple_memory_cache.put(json_cache_key, json_data)
-    return json_data
 
 
 def get_days_arr(initial_date, number_of_days):
