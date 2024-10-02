@@ -12,7 +12,7 @@ import tempfile
 from tabulate import tabulate
 import pytz
 from sunspots_database_dao import SunspotsDatabaseDao
-
+import requests
 db_dao = SunspotsDatabaseDao()
 
 
@@ -128,28 +128,49 @@ def is_sunspot_on(sunspots, table_contents):
         item for item in table_contents if item['noaaNumber'] in sunspots]
     return table_contents
 
-
 def download_images(images, days_arr):
-    images = [scrapping.download_img(image) for image in images]
-    return images
+    downloaded_images = []
+    
+    for image in images:
+        try:
+            downloaded_image = scrapping.download_img(image)
+            downloaded_images.append(downloaded_image)
+        except requests.exceptions.MissingSchema or ValueError:
+            downloaded_images.append(None)
+    
+    return downloaded_images
 
 
 def cache_and_get_solar_monitor_info_from_day(date):
     cached_json_data, cached_img_data = db_dao.fetch_data_by_date(date)
 
-    if cached_json_data is not None and cached_img_data is not None:
+    # Return cached data if both JSON and image are present
+    if cached_json_data is not None:
+        print(f"Date {date} cached!")
         return cached_json_data, cached_img_data
 
+    # Fetch new solar monitor information
     solar_monitor_info = get_solar_monitor_info([date])
     table_contents_aux = convert_table_contents_to_json(solar_monitor_info)
     json_data = []
     process_positions(table_contents_aux, json_data, [date])
+
+    # Convert date to appropriate format
     formatted_date = datetime.datetime.strptime(date, "%Y-%m-%d")
+
+    # Fetch solar monitor images
     images = get_solar_monitor_images(formatted_date)
-    image = download_images(images, [formatted_date])[0]
-    image = image_encode(image)
+    image = download_images(images, [formatted_date])[0]  # Download image for the date
+
+    # Encode the image if it exists
+    if image is not None:
+        image = image_encode(image)
+    
+    # Save data to the database, only insert the image if it's valid
     db_dao.insert_data(date, json_data, image)
+
     return json_data, image
+
 
 
 def get_days_arr(initial_date, number_of_days):

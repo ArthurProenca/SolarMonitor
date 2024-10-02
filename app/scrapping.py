@@ -84,5 +84,20 @@ def get_table_image_from_date(year, month, day):
 
 def download_img(url):
     response = requests.get(url)
-    imagem = cv2.imdecode(np.frombuffer(response.content, np.uint8), cv2.IMREAD_COLOR)
-    return imagem
+    
+    # Verifica se o download foi bem-sucedido
+    if response.status_code == 200:
+        img_array = np.frombuffer(response.content, np.uint8)
+        
+        # Verifica se o conteúdo da imagem não está vazio
+        if img_array.size > 0:
+            imagem = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            if imagem is not None:
+                return imagem
+            else:
+                raise ValueError("Falha ao decodificar a imagem.")
+        else:
+            print("error->", url)
+            return None
+    else:
+        raise ValueError(f"Falha ao baixar a imagem. Status code: {response.status_code}")
