@@ -27,7 +27,7 @@ def date_sanity_check(date_obj):
 
 
 def sunspot_backtracking(initial_date, sunspots):
-    content, _ = cache_and_get_solar_monitor_info_from_day(initial_date)
+    content, _ = cache_and_get_solar_monitor_info_from_day(initial_date, data_only=True)
     right_half = get_negative_days_arr(initial_date, 0)
     left_half = get_positive_days_arr(initial_date, 0)
     full_content = {}
@@ -39,10 +39,10 @@ def sunspot_backtracking(initial_date, sunspots):
             right_half = get_positive_days_arr(right_half, 1)
             break
         right_half = get_negative_days_arr(right_half, 1)
-        content, _ = cache_and_get_solar_monitor_info_from_day(right_half)
+        content, _ = cache_and_get_solar_monitor_info_from_day(right_half, data_only=True)
 
     content, _ = cache_and_get_solar_monitor_info_from_day(
-        initial_date)  # Reinicia o conteúdo para a data inicial
+        initial_date, data_only=True)  # Reinicia o conteúdo para a data inicial
 
     while True:
         matching_content = is_sunspot_on(sunspots, content)
@@ -54,7 +54,7 @@ def sunspot_backtracking(initial_date, sunspots):
         if date_sanity_check(left_half) is None:
             left_half = get_negative_days_arr(left_half, 1)
             break
-        content, _ = cache_and_get_solar_monitor_info_from_day(left_half)
+        content, _ = cache_and_get_solar_monitor_info_from_day(left_half, data_only=True)
 
     return right_half, left_half, full_content
 
@@ -141,22 +141,24 @@ def download_images(images, days_arr):
     return downloaded_images
 
 
-def cache_and_get_solar_monitor_info_from_day(date):
-    cached_json_data, cached_img_data = db_dao.fetch_data_by_date(date)
-
-    # Return cached data if both JSON and image are present
-    if cached_json_data is not None:
-        print(f"Date {date} cached!")
-        return cached_json_data, cached_img_data
-
-    # Fetch new solar monitor information
-    solar_monitor_info = get_solar_monitor_info([date])
-    table_contents_aux = convert_table_contents_to_json(solar_monitor_info)
-    json_data = []
-    process_positions(table_contents_aux, json_data, [date])
-
+def cache_and_get_solar_monitor_info_from_day(date, data_only = False):
+    json_data = db_dao.fetch_data_by_date(date)
     # Convert date to appropriate format
     formatted_date = datetime.datetime.strptime(date, "%Y-%m-%d")
+    # Return cached data if both JSON and image are present
+    if json_data is None:
+        # Fetch new solar monitor information
+        solar_monitor_info = get_solar_monitor_info([date])
+        table_contents_aux = convert_table_contents_to_json(solar_monitor_info)
+        json_data = []
+        process_positions(table_contents_aux, json_data, [date])
+
+       
+        # Save data to the database, only insert the image if it's valid
+        db_dao.insert_data(date, json_data)
+    
+    if data_only:
+        return json_data, None
 
     # Fetch solar monitor images
     images = get_solar_monitor_images(formatted_date)
@@ -165,9 +167,6 @@ def cache_and_get_solar_monitor_info_from_day(date):
     # Encode the image if it exists
     if image is not None:
         image = image_encode(image)
-    
-    # Save data to the database, only insert the image if it's valid
-    db_dao.insert_data(date, json_data, image)
 
     return json_data, image
 

@@ -73,7 +73,7 @@ def get_solar_monitor_sunspots_amount(search_type=Query("MONTHLY"),
 
     for date in dates:
         full_content[count], _ = utils.cache_and_get_solar_monitor_info_from_day(
-            date)
+            date, data_only=True)
         count += 1
 
     full_content = utils.data_equalizer(full_content)

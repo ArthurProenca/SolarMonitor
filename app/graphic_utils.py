@@ -97,32 +97,34 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
     plt.close()
 
 def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, search_type):
-    plt.figure(figsize=(16, 8))
+    plt.figure(figsize=(18, 9))
 
-    # Collect sunspot data by period
+    # Coleta de dados de manchas solares por período
     noaa_numbers_by_period = {}
     for entry in result:
         positions = entry['latestPositions']
         for pos in positions:
             date = datetime.strptime(pos['date'], '%Y-%m-%d')
             noaa_number = entry['noaaNumber']
-            period_key = date.strftime('%Y-%m') if search_type == 'MONTHLY' else date.strftime('%Y')
+            period_key = date.strftime('%Y-%m' if search_type == 'MONTHLY' else '%Y')
 
             if period_key not in noaa_numbers_by_period:
                 noaa_numbers_by_period[period_key] = []
             noaa_numbers_by_period[period_key].append(int(noaa_number))
 
-    # Prepare data for plotting
+    # Preparação dos dados para plotagem
     periods = sorted(noaa_numbers_by_period.keys())
     sunspot_counts = [abs(noaa_numbers_by_period[period][0] - noaa_numbers_by_period[period][-1]) for period in periods]
 
     period_dates = [datetime.strptime(period, '%Y-%m' if search_type == 'MONTHLY' else '%Y') for period in periods]
-    plt.scatter(period_dates, sunspot_counts, marker='o', color='b', label='Manchas Solares')
+
+    # Plot com transparência e tamanho ajustado para evitar sobreposição
+    plt.scatter(period_dates, sunspot_counts, marker='o', color='b', alpha=0.6, s=40, label='Manchas Solares')
 
     plt.xlabel('Período', fontsize=14)
     plt.ylabel('Quantidade de Manchas', fontsize=14)
 
-    # Title adjustment
+    # Ajuste do título
     title_period = "mensal" if search_type == 'MONTHLY' else "anual"
     if search_type == 'MONTHLY':
         title = f'Gráfico {title_period}: Número de manchas entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}'
@@ -132,22 +134,26 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
 
     plt.grid(True, linestyle='--', linewidth=0.5)
 
-    # Date formatting
+    # Formatação de datas no eixo x
     ax = plt.gca()
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3) if search_type == 'MONTHLY' else mdates.YearLocator(interval=1))  # Adjust the interval here
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y' if search_type == 'MONTHLY' else '%Y'))
-    
-    # Rotate and format the x-tick labels for better readability
+    if search_type == 'MONTHLY':
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))  # Intervalo ajustado para 6 meses
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+    else:
+        ax.xaxis.set_major_locator(mdates.YearLocator(base=2))  # Usando o parâmetro 'base' para 2 anos
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))  # Formatação anual
+
+    # Rotacionar rótulos do eixo x
     plt.xticks(rotation=45, ha='right', fontsize=12)
 
-    # Limit adjustments for the y-axis
+    # Limite no eixo y
     plt.ylim(0, max(sunspot_counts) + 5)
 
-    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=12)
+    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=5)
 
-    # Adjust layout
+    # Ajuste do layout
     plt.subplots_adjust(left=0.08, right=0.95, top=0.92, bottom=0.15)
 
-    # Save the image in the buffer
+    # Salvando a imagem no buffer
     plt.savefig(img_bytes, format='png')
     plt.close()
