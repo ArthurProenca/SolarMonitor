@@ -147,7 +147,7 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
     plt.xticks(rotation=45, ha='right', fontsize=12)
 
     # Limite no eixo y
-    plt.ylim(0, max(sunspot_counts) + 5)
+    plt.ylim(-5, max(sunspot_counts) + 5)
 
     plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=5)
 

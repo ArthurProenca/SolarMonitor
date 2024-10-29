@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse, Response
 import image_utils
@@ -8,7 +8,19 @@ import io
 import zipfile
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+app = FastAPI(
+    title="Solaire",
+    description="API for Solar Monitor info",
+    version="1.0.0",
+    contact={
+        "name": "API Support",
+        "email": "arthur.proenca@sou.unifal-mg.edu.br"
+    },
+    license_info={
+        "name": "Apache 2.0",
+        "url": "http://www.apache.org/licenses/LICENSE-2.0.html",
+    },
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,32 +31,72 @@ app.add_middleware(
 )
 
 
-@app.get("/api/v1/solar-monitor/jpeg")
-def get_solar_monitor_jpeg_from_date(date: str = Query(None),
-                                     download: bool = Query(False),
-                                     pre_process: bool = Query(False)):
-
+@app.get(
+    "/api/v1/solar-monitor/jpeg",
+    summary="Retrieve a JPEG image from the solar monitor by date",
+    description=(
+        "Fetch a JPEG image from the solar monitor for a specific date. "
+        "The `download` flag allows the image to be downloaded, and the "
+        "`pre_process` flag applies preprocessing to the image if set to True."
+    ),
+)
+def get_solar_monitor_jpeg_from_date(
+    date: Optional[str] = Query(
+        None, 
+        description="Date for which the JPEG is to be fetched, in YYYY-MM-DD format."
+    ),
+    download: bool = Query(
+        False, 
+        description="Set to True to download the image instead of displaying it in the browser."
+    ),
+    pre_process: bool = Query(
+        False, 
+        description="Set to True to apply preprocessing to the image before returning it."
+    )
+):
+    # Get the date array
     days_arr = utils.get_days_arr(date, 0)
 
+    # Retrieve and process images
     _, images = get_content(days_arr[0], pre_process)
-
     image_bytes = image_utils.create_image([images])
 
+    # Return the image, with download option if selected
     if download:
         response = StreamingResponse(image_bytes, media_type="image/jpeg")
         filename = f"solar_monitor_{date}.jpeg"
-        response.headers["Content-Disposition"] = 'attachment; filename=' + filename
+        response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
-    else:
-        return StreamingResponse(image_bytes, media_type="image/jpeg")
+
+    return StreamingResponse(image_bytes, media_type="image/jpeg")
 
 
-@app.get("/api/v1/solar-monitor/sunspots/gif")
+@app.get(
+    "/api/v1/solar-monitor/sunspots/gif",
+    summary="Retrieve a GIF of solar sunspots for a specified date",
+    description=(
+        "Fetch a GIF image representing solar sunspots information for a given date. "
+        "You can specify sunspots to highlight, request to download the GIF, or apply OCR "
+        "to extract text data from the image."
+    ),
+)
 def get_solar_monitor_spot_info(
-        date: str = Query(None),
-        sunspots: List[str] = Query(None),
-        download: bool = Query(False),
-        ocr: bool = Query(False)
+    date: Optional[str] = Query(
+        None,
+        description="Date for which the sunspots GIF is to be fetched, in YYYY-MM-DD format."
+    ),
+    sunspots: Optional[List[str]] = Query(
+        None,
+        description="List of specific NOAA IDs to highlight in the GIF."
+    ),
+    download: bool = Query(
+        False,
+        description="Set to True to download the GIF instead of displaying it in the browser."
+    ),
+    ocr: bool = Query(
+        False,
+        description="Set to True to perform OCR on the GIF to highlight text data from the image."
+    )
 ):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
         date, sunspots)
@@ -63,10 +115,29 @@ def get_solar_monitor_spot_info(
         return StreamingResponse(gif_bytes, media_type="image/gif")
 
 
-@app.get("/api/v1/solar-monitor/sunspots-amount")
-def get_solar_monitor_sunspots_amount(search_type=Query("MONTHLY"),
-                                      initial_date=Query(None),
-                                      final_date=Query(None)):
+@app.get(
+    "/api/v1/solar-monitor/sunspots-amount",
+    summary="Retrieve the amount of solar sunspots within a date range",
+    description=(
+        "Fetch the count of solar sunspots observed within a specified date range. "
+        "You can choose to group the data monthly or yearly using the `search_type` parameter."
+    ),
+)
+def get_solar_monitor_sunspots_amount(
+    search_type: str = Query(
+        "MONTHLY", 
+        description="Specify the aggregation type for sunspot count. Options: 'MONTHLY' or 'YEARLY'.",
+        regex="^(MONTHLY|YEARLY)$"
+    ),
+    initial_date: Optional[str] = Query(
+        None,
+        description="The start date for the data search range, in YYYY-MM-DD format."
+    ),
+    final_date: Optional[str] = Query(
+        None,
+        description="The end date for the data search range, in YYYY-MM-DD format."
+    )
+):
     full_content = {}
     count = 0
     dates = utils.get_days_arr_between_dates(initial_date, final_date, search_type)
@@ -84,12 +155,32 @@ def get_solar_monitor_sunspots_amount(search_type=Query("MONTHLY"),
     return StreamingResponse(img_bytes, media_type="image/jpeg")
 
 
-@app.get("/api/v1/solar-monitor/sunspots")
+@app.get(
+    "/api/v1/solar-monitor/sunspots",
+    summary="Analyze solar sunspots for a specified date",
+    description=(
+        "Retrieve and analyze solar sunspots data for a given date. "
+        "You can specify sunspot IDs to focus on, apply a linear adjustment "
+        "to the data points, and download the result as a file if desired."
+    ),
+)
 def get_solar_monitor_spot_info(
-        date: str = Query(None),
-        sunspots: List[str] = Query(None),
-        linear_adjustment: bool = Query(True),
-        download: bool = Query(False)
+    date: Optional[str] = Query(
+        None,
+        description="The date for which sunspot analysis is requested, in YYYY-MM-DD format."
+    ),
+    sunspots: Optional[List[str]] = Query(
+        None,
+        description="List of specific sunspot IDs to include in the analysis."
+    ),
+    linear_adjustment: bool = Query(
+        True,
+        description="Set to True to apply linear adjustment to the sunspot data points in the generated graph."
+    ),
+    download: bool = Query(
+        False,
+        description="Set to True to download the analysis result instead of displaying it in the browser."
+    )
 ):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
         date, sunspots)
@@ -114,7 +205,7 @@ def get_solar_monitor_spot_info(
     return StreamingResponse(img_bytes, media_type="image/jpeg")
 
 
-@app.get("/api/v1/solar-monitor/sunspots/zip")
+@app.get("/api/v1/solar-monitor/sunspots/zip", include_in_schema=False)
 def get_raw_content(date: str = Query(None), sunspots: List[str] = Query(None)):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
         date, sunspots)
