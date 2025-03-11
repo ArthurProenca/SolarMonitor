@@ -193,7 +193,6 @@ def get_days_arr(initial_date, number_of_days):
         current_date += datetime.timedelta(days=1)
     return days_arr
 
-
 def get_days_arr_between_dates(initial_date: str, final_date: str, type: str):
     # Verifica se as datas foram fornecidas
     if initial_date is None or final_date is None:
@@ -230,44 +229,31 @@ def get_days_arr_between_dates(initial_date: str, final_date: str, type: str):
                 day=calendar.monthrange(current_date.year, current_date.month)[1]
             )
 
-            # Se for o mês atual, usa o dia atual - 1
-            if current_date.year == datetime.datetime.now().year and current_date.month == datetime.datetime.now().month:
-                if final_date >= current_date.replace(day=datetime.datetime.now().day - 1):
-                    days_arr.append(first_day_of_month.strftime("%Y-%m-%d"))
-                    days_arr.append((current_date.replace(day=datetime.datetime.now().day - 1)).strftime("%Y-%m-%d"))
-            else:
-                # Adiciona o primeiro dia do mês
-                if first_day_of_month >= initial_date:
-                    days_arr.append(first_day_of_month.strftime("%Y-%m-%d"))
-                # Adiciona o último dia do mês
-                if last_day_of_month <= final_date:
-                    days_arr.append(last_day_of_month.strftime("%Y-%m-%d"))
+            if first_day_of_month >= initial_date:
+                days_arr.append(first_day_of_month.strftime("%Y-%m-%d"))
+            if last_day_of_month <= final_date:
+                days_arr.append(last_day_of_month.strftime("%Y-%m-%d"))
 
             # Avança para o próximo mês
-            if current_date.month == 12:
-                current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
-            else:
-                current_date = current_date.replace(month=current_date.month + 1, day=1)
+            current_date = (current_date.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
 
     elif type == "YEARLY":
         # Adiciona o primeiro e o último dia de cada ano entre as datas
         current_date = initial_date
-        while current_date <= final_date:
-            first_day_of_year = current_date.replace(month=1, day=1)
-            last_day_of_year = current_date.replace(month=12, day=31)
+        while current_date.year <= final_date.year:
+            first_day_of_year = datetime.datetime(current_date.year, 1, 1)
+            last_day_of_year = datetime.datetime(current_date.year, 12, 31)
 
-            # Se for o ano atual, usa o primeiro dia do ano e o dia atual - 1
-            if current_date.year == datetime.datetime.now().year:
-                if final_date >= current_date.replace(day=datetime.datetime.now().day - 1):
-                    days_arr.append(first_day_of_year.strftime("%Y-%m-%d"))
-                    days_arr.append((current_date.replace(day=datetime.datetime.now().day - 1)).strftime("%Y-%m-%d"))
+            # Adiciona o primeiro dia do ano
+            if first_day_of_year >= initial_date:
+                days_arr.append(first_day_of_year.strftime("%Y-%m-%d"))
+
+            # Se o último dia do ano ultrapassa `final_date`, adiciona `final_date` no lugar
+            if last_day_of_year <= final_date:
+                days_arr.append(last_day_of_year.strftime("%Y-%m-%d"))
             else:
-                # Adiciona o primeiro dia do ano
-                if first_day_of_year >= initial_date:
-                    days_arr.append(first_day_of_year.strftime("%Y-%m-%d"))
-                # Adiciona o último dia do ano
-                if last_day_of_year <= final_date:
-                    days_arr.append(last_day_of_year.strftime("%Y-%m-%d"))
+                days_arr.append(final_date.strftime("%Y-%m-%d"))
+                break  # Para o loop, pois já alcançamos a data final
 
             # Avança para o próximo ano
             current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
@@ -278,6 +264,7 @@ def get_days_arr_between_dates(initial_date: str, final_date: str, type: str):
         )
 
     return days_arr
+
 
 
 def get_by_noaa_number(result, noaa_numbers):

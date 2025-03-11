@@ -141,7 +141,6 @@ def get_solar_monitor_sunspots_amount(
     full_content = {}
     count = 0
     dates = utils.get_days_arr_between_dates(initial_date, final_date, search_type)
-
     for date in dates:
         full_content[count], _ = utils.cache_and_get_solar_monitor_info_from_day(
             date, data_only=True)

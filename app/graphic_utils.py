@@ -3,7 +3,7 @@ import re
 import numpy as np
 from datetime import datetime
 import matplotlib.dates as mdates  # Importe o módulo matplotlib.dates
-
+import locale
 
 def medium(list_aux):
     if not list_aux:
@@ -96,33 +96,45 @@ def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
     plt.savefig(img_bytes, format='png', bbox_inches='tight')
     plt.close()
 
-def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, search_type):
-    plt.figure(figsize=(18, 9))
 
+def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, search_type):
+    if search_type == "MONTHLY":
+        plt.figure(figsize=(30, 15))
+    else:
+        plt.figure(figsize=(22, 10))
     # Coleta de dados de manchas solares por período
+    # Em vez de armazenar apenas o noaa_number, armazene uma tupla (data, noaa_number)
     noaa_numbers_by_period = {}
     for entry in result:
         positions = entry['latestPositions']
         for pos in positions:
-            date = datetime.strptime(pos['date'], '%Y-%m-%d')
-            noaa_number = entry['noaaNumber']
-            period_key = date.strftime('%Y-%m' if search_type == 'MONTHLY' else '%Y')
+            pos_date = datetime.strptime(pos['date'], '%Y-%m-%d')
+            noaa_number = int(entry['noaaNumber'])
+            period_key = pos_date.strftime('%Y-%m' if search_type == 'MONTHLY' else '%Y')
 
             if period_key not in noaa_numbers_by_period:
                 noaa_numbers_by_period[period_key] = []
-            noaa_numbers_by_period[period_key].append(int(noaa_number))
+            noaa_numbers_by_period[period_key].append((pos_date, noaa_number))
 
-    # Preparação dos dados para plotagem
+    # Ordena os dados de cada período pela data
+    for period in noaa_numbers_by_period:
+        noaa_numbers_by_period[period].sort(key=lambda x: x[0])
+
+    # Calcula a contagem com base no primeiro e último valor ordenado
     periods = sorted(noaa_numbers_by_period.keys())
-    sunspot_counts = [abs(noaa_numbers_by_period[period][0] - noaa_numbers_by_period[period][-1]) for period in periods]
+
+    sunspot_counts = [
+        abs(noaa_numbers_by_period[period][0][1] - noaa_numbers_by_period[period][-1][1])
+        for period in periods
+    ]
 
     period_dates = [datetime.strptime(period, '%Y-%m' if search_type == 'MONTHLY' else '%Y') for period in periods]
 
     # Plot com transparência e tamanho ajustado para evitar sobreposição
     plt.scatter(period_dates, sunspot_counts, marker='o', color='b', alpha=0.6, s=40, label='Manchas Solares')
 
-    plt.xlabel('Período', fontsize=14)
-    plt.ylabel('Quantidade de Manchas', fontsize=14)
+    plt.xlabel('Período', fontsize=18)
+    plt.ylabel('Quantidade de Manchas', fontsize=18)
 
     # Ajuste do título
     title_period = "mensal" if search_type == 'MONTHLY' else "anual"
@@ -130,21 +142,22 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
         title = f'Gráfico {title_period}: Número de manchas entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}'
     else:
         title = f'Gráfico {title_period}: Número de manchas entre {periods[0]} e {periods[-1]}'
-    plt.title(title, fontsize=14)
+    plt.title(title, fontsize=18)
 
     plt.grid(True, linestyle='--', linewidth=0.5)
 
     # Formatação de datas no eixo x
+    locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
     ax = plt.gca()
     if search_type == 'MONTHLY':
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))  # Intervalo ajustado para 6 meses
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
     else:
-        ax.xaxis.set_major_locator(mdates.YearLocator(base=2))  # Usando o parâmetro 'base' para 2 anos
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))  # Formatação anual
+        ax.xaxis.set_major_locator(mdates.YearLocator(base=1))  
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))  
 
     # Rotacionar rótulos do eixo x
-    plt.xticks(rotation=45, ha='right', fontsize=12)
+    plt.xticks(rotation=60, ha='right', fontsize=12)
 
     # Limite no eixo y
     plt.ylim(-5, max(sunspot_counts) + 5)
