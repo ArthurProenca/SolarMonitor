@@ -146,8 +146,6 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
 
     plt.grid(True, linestyle='--', linewidth=0.5)
 
-    # Formatação de datas no eixo x
-    locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
     ax = plt.gca()
     if search_type == 'MONTHLY':
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  
