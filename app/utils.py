@@ -194,14 +194,12 @@ def get_days_arr(initial_date, number_of_days):
     return days_arr
 
 def get_days_arr_between_dates(initial_date: str, final_date: str, type: str):
-    # Verifica se as datas foram fornecidas
     if initial_date is None or final_date is None:
         raise HTTPException(
             status_code=400, detail="Both initial_date and final_date must be provided."
         )
 
     try:
-        # Converte as strings em objetos datetime
         initial_date = datetime.datetime.strptime(initial_date, "%Y-%m-%d")
         final_date = datetime.datetime.strptime(final_date, "%Y-%m-%d")
     except ValueError:
@@ -209,22 +207,26 @@ def get_days_arr_between_dates(initial_date: str, final_date: str, type: str):
             status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
         )
 
-    # Verifica se a data final é anterior à inicial
     if final_date < initial_date:
         raise HTTPException(
             status_code=400, detail="Final date must be greater than or equal to initial date."
         )
 
-    # Gera o array de dias de acordo com o tipo
     days_arr = []
 
     if type == "MONTHLY":
-        # Adiciona o primeiro e o último dia de cada mês entre as datas
         current_date = initial_date
+        today = datetime.datetime.today()
+        current_month = today.month
+        current_year = today.year
+
         while current_date <= final_date:
-            # Primeiro dia do mês
+            if current_date.month == current_month and current_date.year == current_year:
+                # pula o mês atual
+                current_date = (current_date.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
+                continue
+
             first_day_of_month = current_date.replace(day=1)
-            # Último dia do mês
             last_day_of_month = current_date.replace(
                 day=calendar.monthrange(current_date.year, current_date.month)[1]
             )
@@ -234,28 +236,23 @@ def get_days_arr_between_dates(initial_date: str, final_date: str, type: str):
             if last_day_of_month <= final_date:
                 days_arr.append(last_day_of_month.strftime("%Y-%m-%d"))
 
-            # Avança para o próximo mês
             current_date = (current_date.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
 
     elif type == "YEARLY":
-        # Adiciona o primeiro e o último dia de cada ano entre as datas
         current_date = initial_date
         while current_date.year <= final_date.year:
             first_day_of_year = datetime.datetime(current_date.year, 1, 1)
             last_day_of_year = datetime.datetime(current_date.year, 12, 31)
 
-            # Adiciona o primeiro dia do ano
             if first_day_of_year >= initial_date:
                 days_arr.append(first_day_of_year.strftime("%Y-%m-%d"))
 
-            # Se o último dia do ano ultrapassa `final_date`, adiciona `final_date` no lugar
             if last_day_of_year <= final_date:
                 days_arr.append(last_day_of_year.strftime("%Y-%m-%d"))
             else:
                 days_arr.append(final_date.strftime("%Y-%m-%d"))
-                break  # Para o loop, pois já alcançamos a data final
+                break
 
-            # Avança para o próximo ano
             current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
 
     else:
@@ -264,8 +261,6 @@ def get_days_arr_between_dates(initial_date: str, final_date: str, type: str):
         )
 
     return days_arr
-
-
 
 def get_by_noaa_number(result, noaa_numbers):
     selected_items_arr = []
