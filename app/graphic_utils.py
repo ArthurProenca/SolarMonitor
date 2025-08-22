@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime
 import matplotlib.dates as mdates  # Importe o módulo matplotlib.dates
 import locale
-
+from matplotlib.ticker import MaxNLocator
 def medium(list_aux):
     if not list_aux:
         return 0
@@ -123,7 +123,15 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
     # Calcula a contagem com base no primeiro e último valor ordenado
     periods = sorted(noaa_numbers_by_period.keys())
 
-    sunspot_counts = [
+    sunspot_counts = 0
+    if search_type == 'MONTHLY':    
+        sunspot_counts = [
+            0 if len(noaa_numbers_by_period[period]) ==  1
+            else len(noaa_numbers_by_period[period])
+            for period in periods
+        ]
+    else:
+        sunspot_counts = [
         abs(noaa_numbers_by_period[period][0][1] - noaa_numbers_by_period[period][-1][1])
         for period in periods
     ]
@@ -148,17 +156,20 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
 
     ax = plt.gca()
     if search_type == 'MONTHLY':
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1 if len(sunspot_counts) < 24 else 3))  # Marcar meses no eixo x
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
     else:
         ax.xaxis.set_major_locator(mdates.YearLocator(base=1))  
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))  
 
+
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
     # Rotacionar rótulos do eixo x
     plt.xticks(rotation=60, ha='right', fontsize=12)
 
     # Limite no eixo y
-    plt.ylim(-5, max(sunspot_counts) + 5)
+    plt.ylim(-1, max(sunspot_counts) + 5)
 
     plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=5)
 
