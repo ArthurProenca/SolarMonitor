@@ -252,7 +252,7 @@ def get_content(day, pre_process):
     return content, image
 
 
-def get_images_to_gif(initial_date, number_of_days, sunspot, pre_process, ocr):
+def get_images_to_gif(initial_date, number_of_days, sunspot, pre_process, ocr = False):
     days_arr = utils.get_days_arr(initial_date, number_of_days)
     images = []
 
