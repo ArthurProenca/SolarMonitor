@@ -179,6 +179,10 @@ def get_solar_monitor_spot_info(
     download: bool = Query(
         False,
         description="Set to True to download the analysis result instead of displaying it in the browser."
+    ),
+    fourier: bool = Query(
+        False,
+        description="Set to True to generate a Fourier analysis graph of the sunspot data."
     )
 ):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
@@ -191,8 +195,10 @@ def get_solar_monitor_spot_info(
 
     img_bytes = io.BytesIO()
 
-    graphic_utils.create_graphic(
-        full_content, img_bytes, initial_date, final_date, linear_adjustment)
+    if fourier:
+        graphic_utils.create_fourier_graphic(full_content, img_bytes, initial_date, final_date)
+    else:
+        graphic_utils.create_graphic(full_content, img_bytes, initial_date, final_date, linear_adjustment)
 
     img_bytes.seek(0)
 
@@ -204,7 +210,7 @@ def get_solar_monitor_spot_info(
     return StreamingResponse(img_bytes, media_type="image/jpeg")
 
 
-@app.get("/api/v1/solar-monitor/sunspots/zip", include_in_schema=False)
+@app.get("/api/v1/solar-monitor/sunspots/zip", include_in_schema=True)
 def get_raw_content(date: str = Query(None), sunspots: List[str] = Query(None)):
     initial_date, final_date, full_content = utils.sunspot_backtracking(
         date, sunspots)
@@ -220,6 +226,10 @@ def get_raw_content(date: str = Query(None), sunspots: List[str] = Query(None)):
     table_bytes = io.BytesIO()
     csv_bytes = io.BytesIO()
     img_bytes = io.BytesIO()
+    fourier_bytes = io.BytesIO()
+
+    graphic_utils.create_fourier_graphic(
+        full_content, fourier_bytes, initial_date, final_date)
 
     graphic_utils.create_graphic(
         full_content, img_bytes, initial_date, final_date, False)
@@ -235,6 +245,7 @@ def get_raw_content(date: str = Query(None), sunspots: List[str] = Query(None)):
         zip_file.writestr('tabela.txt', table_bytes.getvalue())
         zip_file.writestr('planilha.csv', csv_bytes.getvalue())
         zip_file.writestr('grafico.png', img_bytes.getvalue())
+        zip_file.writestr('fourier.png', fourier_bytes.getvalue())
 
     # Configure the response for the ZIP file
     response = Response(zip_buffer.getvalue(), media_type='application/zip')

@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import re
 import numpy as np
@@ -178,4 +180,144 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
 
     # Salvando a imagem no buffer
     plt.savefig(img_bytes, format='png')
+    plt.close()
+
+def create_fourier_graphic(result, img_bytes, initial_date, final_date, max_harm=15):
+    best_spot = None
+    best_rmse = np.inf
+
+    # ===============================
+    # 1) Escolher a melhor mancha
+    # ===============================
+    for sunspot in result:
+        positions = sunspot.get("latestPositions", [])
+
+        if len(positions) < 6:
+            continue  # poucos pontos → descarta
+
+        positions = sorted(positions, key=lambda x: x["date"])
+
+        dates = [datetime.strptime(p["date"], "%Y-%m-%d") for p in positions]
+        longitudes = np.array([p["longitude"] for p in positions], dtype=float)
+
+        t0 = dates[0]
+        t = np.array([(d - t0).days for d in dates], dtype=float)
+
+        M = len(t)
+        T = t[-1] - t[0] if t[-1] != 0 else 1
+        omega0 = 2 * np.pi / T
+
+        # Fourier
+        a0 = np.mean(longitudes)
+        a = np.zeros(max_harm)
+        b = np.zeros(max_harm)
+
+        for n in range(1, max_harm + 1):
+            a[n - 1] = (2 / M) * np.sum(longitudes * np.cos(n * omega0 * t))
+            b[n - 1] = (2 / M) * np.sum(longitudes * np.sin(n * omega0 * t))
+
+        # Reconstrução nos pontos observados
+        f_rec = np.full_like(longitudes, a0)
+        for n in range(1, max_harm + 1):
+            f_rec += (
+                a[n - 1] * np.cos(n * omega0 * t)
+                + b[n - 1] * np.sin(n * omega0 * t)
+            )
+
+        rmse = np.sqrt(np.mean((longitudes - f_rec) ** 2))
+
+        if rmse < best_rmse:
+            best_rmse = rmse
+            best_spot = sunspot
+
+    # ===============================
+    # 2) Se nenhuma mancha válida
+    # ===============================
+    if best_spot is None:
+        raise ValueError("Nenhuma mancha com dados suficientes para Fourier.")
+
+    # ===============================
+    # 3) Fourier FINAL da melhor
+    # ===============================
+    positions = sorted(best_spot["latestPositions"], key=lambda x: x["date"])
+    noaa_number = best_spot["noaaNumber"]
+
+    dates = [datetime.strptime(p["date"], "%Y-%m-%d") for p in positions]
+    longitudes = np.array([p["longitude"] for p in positions], dtype=float)
+
+    t0 = dates[0]
+    t = np.array([(d - t0).days for d in dates], dtype=float)
+
+    M = len(t)
+    T = t[-1] - t[0] if t[-1] != 0 else 1
+    omega0 = 2 * np.pi / T
+
+    a0 = np.mean(longitudes)
+    a = np.zeros(max_harm)
+    b = np.zeros(max_harm)
+
+    for n in range(1, max_harm + 1):
+        a[n - 1] = (2 / M) * np.sum(longitudes * np.cos(n * omega0 * t))
+        b[n - 1] = (2 / M) * np.sum(longitudes * np.sin(n * omega0 * t))
+
+    t_dense = np.linspace(t[0], t[-1], 500)
+    f_recon = np.full_like(t_dense, a0)
+
+    for n in range(1, max_harm + 1):
+        f_recon += (
+            a[n - 1] * np.cos(n * omega0 * t_dense)
+            + b[n - 1] * np.sin(n * omega0 * t_dense)
+        )
+
+    # ===============================
+    # 4) Gráfico
+    # ===============================
+    plt.figure(figsize=(11, 7))
+
+    plt.scatter(
+        t,
+        longitudes,
+        label=f"Posições observadas, mancha {noaa_number}",
+        zorder=4
+    )
+
+    plt.plot(
+        t_dense,
+        f_recon,
+        label=f"Ajuste por Série de Fourier ({max_harm} harmônicos)",
+        linewidth=2
+    )
+
+    plt.xlabel("Tempo desde a primeira observação (dias)", fontsize=11)
+    plt.ylabel("Longitude heliográfica (graus)", fontsize=11)
+
+    plt.suptitle(
+        f"Série de Fourier da evolução longitudinal de {initial_date} à {final_date}  |  RMSE = {best_rmse:.2f}°",
+        fontsize=10,
+        y=1
+    )
+
+    plt.legend(frameon=True, fontsize=10)
+
+    plt.grid(
+        which="both",
+        linestyle="--",
+        linewidth=0.6,
+        alpha=0.4
+    )
+
+    # Anotação técnica no gráfico
+    plt.text(
+        0.02,
+        0.02,
+        f"N pontos = {M}\nN harmônicos = {max_harm}",
+        transform=plt.gca().transAxes,
+        fontsize=9,
+        verticalalignment="bottom",
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7)
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(img_bytes, format="png", dpi=150, bbox_inches="tight")
     plt.close()
