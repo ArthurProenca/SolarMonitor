@@ -6,6 +6,10 @@ import numpy as np
 from datetime import datetime
 import matplotlib.dates as mdates  # Importe o módulo matplotlib.dates
 import locale
+from scipy.optimize import curve_fit
+from matplotlib.ticker import MaxNLocator
+from scipy.optimize import curve_fit
+
 from matplotlib.ticker import MaxNLocator
 def medium(list_aux):
     if not list_aux:
@@ -182,142 +186,143 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
     plt.savefig(img_bytes, format='png')
     plt.close()
 
-def create_fourier_graphic(result, img_bytes, initial_date, final_date, max_harm=15):
-    best_spot = None
-    best_rmse = np.inf
+def create_sunspots_amount_fourier_graphic(
+    result,
+    img_bytes,
+    initial_date,
+    final_date,
+    search_type,
+    max_harm=10
+):
+    # ===============================
+    # 1) Construir série temporal
+    # ===============================
+    noaa_numbers_by_period = {}
+
+    for entry in result:
+        for pos in entry["latestPositions"]:
+            pos_date = datetime.strptime(pos["date"], "%Y-%m-%d")
+            period_key = pos_date.strftime("%Y-%m" if search_type == "MONTHLY" else "%Y")
+
+            noaa_numbers_by_period.setdefault(period_key, set())
+            noaa_numbers_by_period[period_key].add(entry["noaaNumber"])
+
+    periods = sorted(noaa_numbers_by_period.keys())
+    y = np.array([len(noaa_numbers_by_period[p]) for p in periods], dtype=float)
+
+    period_dates = [
+        datetime.strptime(p, "%Y-%m" if search_type == "MONTHLY" else "%Y")
+        for p in periods
+    ]
 
     # ===============================
-    # 1) Escolher a melhor mancha
+    # 2) Converter datas → eixo numérico
     # ===============================
-    for sunspot in result:
-        positions = sunspot.get("latestPositions", [])
+    x = np.arange(len(y))
 
-        if len(positions) < 6:
-            continue  # poucos pontos → descarta
+    if len(x) < 6:
+        raise ValueError("Poucos pontos para ajuste senoidal.")
 
-        positions = sorted(positions, key=lambda x: x["date"])
-
-        dates = [datetime.strptime(p["date"], "%Y-%m-%d") for p in positions]
-        longitudes = np.array([p["longitude"] for p in positions], dtype=float)
-
-        t0 = dates[0]
-        t = np.array([(d - t0).days for d in dates], dtype=float)
-
-        M = len(t)
-        T = t[-1] - t[0] if t[-1] != 0 else 1
-        omega0 = 2 * np.pi / T
-
-        # Fourier
-        a0 = np.mean(longitudes)
-        a = np.zeros(max_harm)
-        b = np.zeros(max_harm)
-
-        for n in range(1, max_harm + 1):
-            a[n - 1] = (2 / M) * np.sum(longitudes * np.cos(n * omega0 * t))
-            b[n - 1] = (2 / M) * np.sum(longitudes * np.sin(n * omega0 * t))
-
-        # Reconstrução nos pontos observados
-        f_rec = np.full_like(longitudes, a0)
-        for n in range(1, max_harm + 1):
-            f_rec += (
-                a[n - 1] * np.cos(n * omega0 * t)
-                + b[n - 1] * np.sin(n * omega0 * t)
-            )
-
-        rmse = np.sqrt(np.mean((longitudes - f_rec) ** 2))
-
-        if rmse < best_rmse:
-            best_rmse = rmse
-            best_spot = sunspot
+    dt = 1  # amostragem uniforme (1 mês ou 1 ano)
 
     # ===============================
-    # 2) Se nenhuma mancha válida
+    # 3) FFT para estimar período dominante
     # ===============================
-    if best_spot is None:
-        raise ValueError("Nenhuma mancha com dados suficientes para Fourier.")
+    y_detrended = y - np.mean(y)
 
-    # ===============================
-    # 3) Fourier FINAL da melhor
-    # ===============================
-    positions = sorted(best_spot["latestPositions"], key=lambda x: x["date"])
-    noaa_number = best_spot["noaaNumber"]
+    yf = np.fft.fft(y_detrended)
+    xf = np.fft.fftfreq(len(x), dt)
 
-    dates = [datetime.strptime(p["date"], "%Y-%m-%d") for p in positions]
-    longitudes = np.array([p["longitude"] for p in positions], dtype=float)
+    mask = xf > 0
+    xf = xf[mask]
+    yf = np.abs(yf[mask])
 
-    t0 = dates[0]
-    t = np.array([(d - t0).days for d in dates], dtype=float)
+    if len(xf) == 0:
+        raise ValueError("FFT não encontrou frequências positivas.")
 
-    M = len(t)
-    T = t[-1] - t[0] if t[-1] != 0 else 1
-    omega0 = 2 * np.pi / T
-
-    a0 = np.mean(longitudes)
-    a = np.zeros(max_harm)
-    b = np.zeros(max_harm)
-
-    for n in range(1, max_harm + 1):
-        a[n - 1] = (2 / M) * np.sum(longitudes * np.cos(n * omega0 * t))
-        b[n - 1] = (2 / M) * np.sum(longitudes * np.sin(n * omega0 * t))
-
-    t_dense = np.linspace(t[0], t[-1], 500)
-    f_recon = np.full_like(t_dense, a0)
-
-    for n in range(1, max_harm + 1):
-        f_recon += (
-            a[n - 1] * np.cos(n * omega0 * t_dense)
-            + b[n - 1] * np.sin(n * omega0 * t_dense)
-        )
+    f_dom = xf[np.argmax(yf)]
+    periodo_estimado = 1 / f_dom
+    omega_inicial = 2 * np.pi / periodo_estimado
 
     # ===============================
-    # 4) Gráfico
+    # 4) Modelo senoidal
     # ===============================
-    plt.figure(figsize=(11, 7))
+    def senoide(x, A, omega, fase, C):
+        return A * np.sin(omega * x + fase) + C
+
+    estimativa_inicial = [
+        (np.max(y) - np.min(y)) / 2,  # Amplitude como no código original
+        omega_inicial,                # Frequência angular vinda da FFT
+        0,                            # Fase inicial
+        np.mean(y)                    # Offset
+    ]
+
+    popt, _ = curve_fit(senoide, x, y, p0=estimativa_inicial)
+    A_fit, omega_fit, fase_fit, C_fit = popt
+
+    y_fit = senoide(x, A_fit, omega_fit, fase_fit, C_fit)
+
+    # ===============================
+    # 5) Plot
+    # ===============================
+    plt.figure(figsize=(30, 15) if search_type == "MONTHLY" else (22, 10))
 
     plt.scatter(
-        t,
-        longitudes,
-        label=f"Posições observadas, mancha {noaa_number}",
-        zorder=4
+        period_dates,
+        y,
+        marker="o",
+        alpha=0.6,
+        s=60,
+        label="Quantidade observada",
+        zorder=3
     )
 
     plt.plot(
-        t_dense,
-        f_recon,
-        label=f"Ajuste por Série de Fourier ({max_harm} harmônicos)",
-        linewidth=2
+        period_dates,
+        y_fit,
+        linewidth=3,
+        label=f"Ajuste Senoidal (Período ≈ {2*np.pi/omega_fit:.1f} períodos)"
     )
 
-    plt.xlabel("Tempo desde a primeira observação (dias)", fontsize=11)
-    plt.ylabel("Longitude heliográfica (graus)", fontsize=11)
+    plt.xlabel("Período", fontsize=18)
+    plt.ylabel("Quantidade de manchas solares", fontsize=18)
 
-    plt.suptitle(
-        f"Série de Fourier da evolução longitudinal de {initial_date} à {final_date}  |  RMSE = {best_rmse:.2f}°",
-        fontsize=10,
-        y=1
-    )
+    title_period = "mensal" if search_type == 'MONTHLY' else "anual"
+    if search_type == 'MONTHLY':
+        title = f'Gráfico {title_period}: Número de manchas entre {initial_date} e {final_date}'
+    else:
+        title = f'Gráfico {title_period}: Número de manchas entre {periods[0]} e {periods[-1]}'
 
-    plt.legend(frameon=True, fontsize=10)
+    plt.title(title, fontsize=20)
+    plt.grid(True, linestyle="--", linewidth=0.5)
 
-    plt.grid(
-        which="both",
-        linestyle="--",
-        linewidth=0.6,
-        alpha=0.4
-    )
+    ax = plt.gca()
 
-    # Anotação técnica no gráfico
+    if search_type == "MONTHLY":
+        ax.xaxis.set_major_locator(
+            mdates.MonthLocator(interval=1 if len(y) < 24 else 3)
+        )
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
+    else:
+        ax.xaxis.set_major_locator(mdates.YearLocator(base=1))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.xticks(rotation=60, ha="right", fontsize=12)
+
+    plt.ylim(-1, max(y) + 5)
+    plt.legend(fontsize=14)
+
     plt.text(
-        0.02,
-        0.02,
-        f"N pontos = {M}\nN harmônicos = {max_harm}",
-        transform=plt.gca().transAxes,
-        fontsize=9,
-        verticalalignment="bottom",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7)
+        0.95,
+        0.01,
+        "Fonte dos dados: SolarMonitor.org",
+        transform=ax.transAxes,
+        fontsize=8,
+        ha="right"
     )
 
-    plt.tight_layout()
+    plt.subplots_adjust(left=0.08, right=0.95, top=0.90, bottom=0.18)
 
-    plt.savefig(img_bytes, format="png", dpi=150, bbox_inches="tight")
+    plt.savefig(img_bytes, format="png")
     plt.close()

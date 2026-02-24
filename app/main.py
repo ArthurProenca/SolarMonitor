@@ -136,6 +136,10 @@ def get_solar_monitor_sunspots_amount(
     final_date: Optional[str] = Query(
         None,
         description="The end date for the data search range, in YYYY-MM-DD format."
+    ),
+    fourier: bool = Query(
+        False,
+        description="Set to True to generate a Fourier analysis graph of the sunspot data."
     )
 ):
     full_content = {}
@@ -148,7 +152,10 @@ def get_solar_monitor_sunspots_amount(
 
     full_content = utils.data_equalizer(full_content)
     img_bytes = io.BytesIO()
-    graphic_utils.create_sunspots_amount_graphic(full_content, img_bytes, initial_date, final_date, search_type)
+    if fourier:
+        graphic_utils.create_sunspots_amount_fourier_graphic(full_content, img_bytes, initial_date, final_date, search_type)
+    else:
+        graphic_utils.create_sunspots_amount_graphic(full_content, img_bytes, initial_date, final_date, search_type)
     full_content = {}
     img_bytes.seek(0)
     return StreamingResponse(img_bytes, media_type="image/jpeg")
@@ -253,6 +260,51 @@ def get_raw_content(date: str = Query(None), sunspots: List[str] = Query(None)):
 
     return response
 
+@app.get("/api/v2/solar-monitor/sunspots/zip", include_in_schema=True)
+def get_raw_content_v2(
+    search_type: str = Query(
+        "MONTHLY", 
+        description="Specify the aggregation type for sunspot count. Options: 'MONTHLY' or 'YEARLY'.",
+        regex="^(MONTHLY|YEARLY)$"
+    ),
+    initial_date: Optional[str] = Query(
+        None,
+        description="The start date for the data search range, in YYYY-MM-DD format."
+    ),
+    final_date: Optional[str] = Query(
+        None,
+        description="The end date for the data search range, in YYYY-MM-DD format."
+    )
+):
+    full_content = {}
+    count = 0
+    dates = utils.get_days_arr_between_dates(initial_date, final_date, search_type)
+    for date in dates:
+        full_content[count], _ = utils.cache_and_get_solar_monitor_info_from_day(
+            date, data_only=True)
+        count += 1
+
+    full_content = utils.data_equalizer(full_content)
+    fourier_bytes = io.BytesIO()
+    img_bytes = io.BytesIO()
+    graphic_utils.create_sunspots_amount_fourier_graphic(full_content, fourier_bytes, initial_date, final_date, search_type)
+    graphic_utils.create_sunspots_amount_graphic(full_content, img_bytes, initial_date, final_date, search_type)
+
+    csv_bytes = io.BytesIO()
+    utils.create_csv(full_content, csv_bytes)
+    img_bytes.seek(0)
+    
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+        zip_file.writestr('planilha.csv', csv_bytes.getvalue())
+        zip_file.writestr('grafico.png', img_bytes.getvalue())
+        zip_file.writestr('fourier.png', fourier_bytes.getvalue())
+
+    # Configure the response for the ZIP file
+    response = Response(zip_buffer.getvalue(), media_type='application/zip')
+    response.headers["Content-Disposition"] = 'attachment; filename="analise.zip"'
+
+    return response
 
 def get_content(day, pre_process):
     content, images = utils.cache_and_get_solar_monitor_info_from_day(day)
