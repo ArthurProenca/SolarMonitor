@@ -193,7 +193,6 @@ def _configure_period_axis(ax, search_type, n_points):
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.setp(ax.get_xticklabels(), rotation=55, ha='right')
 
-
 def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, search_type):
     """Gráfico de dispersão: quantidade de manchas solares por período."""
     periods, counts, period_dates = _build_sunspot_series(result, search_type)
@@ -201,11 +200,6 @@ def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, 
     figsize = (28, 13) if search_type == "MONTHLY" else (20, 10)
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Linha conectando os pontos para visualizar tendência
-    ax.plot(
-        period_dates, counts,
-        color='#1f77b4', linewidth=1.2, alpha=0.4, zorder=1,
-    )
     ax.scatter(
         period_dates, counts,
         marker='o', color='#1f77b4', alpha=0.8, s=50,
