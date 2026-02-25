@@ -4,13 +4,60 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 from datetime import datetime
-import matplotlib.dates as mdates  # Importe o módulo matplotlib.dates
-import locale
+import matplotlib.dates as mdates
 from scipy.optimize import curve_fit
-from matplotlib.ticker import MaxNLocator
-from scipy.optimize import curve_fit
+from matplotlib.ticker import MaxNLocator, FuncFormatter
 
-from matplotlib.ticker import MaxNLocator
+
+# ============================================================
+# Constantes e helpers de formatação PT-BR
+# ============================================================
+
+_MONTHS_PT = {
+    'Jan': 'Jan', 'Feb': 'Fev', 'Mar': 'Mar', 'Apr': 'Abr',
+    'May': 'Mai', 'Jun': 'Jun', 'Jul': 'Jul', 'Aug': 'Ago',
+    'Sep': 'Set', 'Oct': 'Out', 'Nov': 'Nov', 'Dec': 'Dez',
+}
+
+# Paleta consistente para múltiplas manchas
+_COLOR_CYCLE = [
+    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+]
+
+
+def _pt_month_formatter(fmt):
+    """Retorna um FuncFormatter que formata datas com meses em português."""
+    def _format(x, pos=None):
+        dt = mdates.num2date(x)
+        label = dt.strftime(fmt)
+        for en, pt in _MONTHS_PT.items():
+            label = label.replace(en, pt)
+        return label
+    return FuncFormatter(_format)
+
+
+def _apply_base_style(ax, fontsize_tick=12):
+    """Aplica estilo visual base a um eixo: grid, tick sizes, spine cleanup."""
+    ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.7)
+    ax.tick_params(axis='both', labelsize=fontsize_tick)
+    for spine in ('top', 'right'):
+        ax.spines[spine].set_visible(False)
+
+
+def _add_source_label(ax, fontsize=10):
+    """Adiciona rótulo de fonte dos dados no canto inferior direito."""
+    ax.text(
+        0.95, 0.01, 'Fonte dos dados: SolarMonitor.org',
+        transform=ax.transAxes, fontsize=fontsize,
+        ha='right', va='bottom', style='italic', alpha=0.6,
+    )
+
+
+# ============================================================
+# Funções utilitárias
+# ============================================================
+
 def medium(list_aux):
     if not list_aux:
         return 0
@@ -18,311 +65,369 @@ def medium(list_aux):
 
 
 def date_format(data, pattern):
-    # Mapeamento de meses em inglês para português
-    months_translation = {
-        'Jan': 'Jan',
-        'Feb': 'Fev',
-        'Mar': 'Mar',
-        'Apr': 'Abr',
-        'May': 'Mai',
-        'Jun': 'Jun',
-        'Jul': 'Jul',
-        'Aug': 'Ago',
-        'Sep': 'Set',
-        'Oct': 'Out',
-        'Nov': 'Nov',
-        'Dec': 'Dez'
-    }
-
-    # Converter a data para um objeto datetime
+    """Formata uma data string (YYYY-MM-DD) com meses em português."""
     data_obj = datetime.strptime(data, "%Y-%m-%d")
-
-    # Formatar a data conforme o padrão fornecido
     date_formatted = data_obj.strftime(pattern)
-
-    # Substituir os nomes dos meses em inglês pelos nomes em português
-    for month_en, month_pt in months_translation.items():
-        date_formatted = date_formatted.replace(month_en, month_pt)
-
+    for en, pt in _MONTHS_PT.items():
+        date_formatted = date_formatted.replace(en, pt)
     return date_formatted
 
 
 def extract_x_value(position):
-    # Extrai o valor 'x' da posição no formato cddcdd(xxx, -yyy)
+    """Extrai o valor 'x' da posição no formato cddcdd(xxx, -yyy)."""
     x_value = re.search(r'\(([-+]?\d+)', position).group(1)
     return int(x_value)
 
 
-def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
-    # Aumentar o tamanho da figura para melhor visualização
-    plt.figure(figsize=(11, 7))
+# ============================================================
+# 1) Gráfico: Longitude x Tempo (manchas individuais)
+# ============================================================
 
-    for entry in result:
+def create_graphic(result, img_bytes, initial_date, final_date, do_adjustment):
+    """Gráfico de dispersão: longitude vs tempo para manchas solares."""
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    for idx, entry in enumerate(result):
         noaa_number = entry['noaaNumber']
         positions = entry['latestPositions']
 
-        # Extrair informações para o gráfico
-        dates = [datetime.strptime(pos['day'], '%Y-%m-%d')
-                 for pos in positions]
+        dates = [datetime.strptime(pos['day'], '%Y-%m-%d') for pos in positions]
         longitudes = [pos['longitude'] for pos in positions]
         latitudes = [pos['latitude'] for pos in positions]
 
-        # Verificar se há pontos suficientes para regressão linear
-        if len(dates) >= 2:
-            plt.scatter(dates, longitudes, label=f'Mancha {noaa_number}, latitude média: {np.mean(latitudes):.2f}', s=100, alpha=0.7)  # Ajuste o tamanho e a transparência dos pontos
+        if len(dates) < 2:
+            continue
 
-            x_values = mdates.date2num(dates)
-            coefficients = np.polyfit(x_values, longitudes, 1)
-            a, b = coefficients
+        color = _COLOR_CYCLE[idx % len(_COLOR_CYCLE)]
+        lat_media = np.mean(latitudes)
 
-            fitted_dates = np.linspace(min(x_values), max(x_values), 100)
-            fitted_dates_original_format = mdates.num2date(fitted_dates)
+        ax.scatter(
+            dates, longitudes,
+            label=f'Mancha {noaa_number} (lat. média: {lat_media:.1f}°)',
+            s=90, alpha=0.8, color=color, edgecolors='white', linewidths=0.5,
+            zorder=3,
+        )
 
-            if do_adjustment:
-                plt.plot(fitted_dates_original_format, a * fitted_dates + b, label=f'Reta de Ajuste (y={a:.2f}x + b)', linestyle='--', linewidth=2)  # Ajuste o estilo e a largura da linha
+        if do_adjustment:
+            x_num = mdates.date2num(dates)
+            coefs = np.polyfit(x_num, longitudes, 1)
+            a, b = coefs
+            x_fit = np.linspace(min(x_num), max(x_num), 200)
+            ax.plot(
+                mdates.num2date(x_fit), a * x_fit + b,
+                linestyle='--', linewidth=2, color=color, alpha=0.7,
+                label=f'Ajuste linear ({noaa_number})',
+            )
 
-    plt.xlabel('Data (formato dd/mm/yy)', fontsize=14)
-    plt.ylabel('Longitude (°)', fontsize=14)
-    plt.title(f'Gráfico: Longitude x Tempo para mancha(s) solar(es) entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}', fontsize=11)
-    # Ajuste a posição e o tamanho da legenda
-    plt.legend(loc='best', fontsize=12)
-    # Adicione um grid mais claro
-    plt.grid(True, linestyle='--', linewidth=0.5)
-    plt.tight_layout()
+    ax.set_xlabel('Data', fontsize=14)
+    ax.set_ylabel('Longitude (°)', fontsize=14)
 
-    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=1))  # Marcar todos os dias no eixo x
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))  # Formatar datas do eixo x
+    titulo = (
+        f'Longitude × Tempo para mancha(s) solar(es)\n'
+        f'{date_format(initial_date, "%d de %b. de %Y")} — '
+        f'{date_format(final_date, "%d de %b. de %Y")}'
+    )
+    ax.set_title(titulo, fontsize=13, fontweight='bold')
 
-    # Rotacionar rótulos do eixo x e aumentar o tamanho da fonte
-    plt.xticks(rotation=45, ha='right', fontsize=12)
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+    ax.xaxis.set_major_formatter(_pt_month_formatter('%d/%m/%y'))
+    plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
 
-    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes,fontsize=12, ha='right', va='bottom')
+    _apply_base_style(ax)
+    ax.legend(loc='best', fontsize=11, framealpha=0.9)
+    _add_source_label(ax, fontsize=10)
 
-    # Use bbox_inches='tight' para incluir a legenda
-    plt.savefig(img_bytes, format='png', bbox_inches='tight')
-    plt.close()
+    fig.tight_layout()
+    fig.savefig(img_bytes, format='png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+
+# ============================================================
+# 2) Gráfico: Quantidade de manchas por período
+# ============================================================
+
+def _build_sunspot_series(result, search_type):
+    """Extrai períodos e contagens de manchas a partir dos dados brutos."""
+    noaa_by_period = {}
+    for entry in result:
+        for pos in entry['latestPositions']:
+            pos_date = datetime.strptime(pos['date'], '%Y-%m-%d')
+            noaa_number = int(entry['noaaNumber'])
+            fmt = '%Y-%m' if search_type == 'MONTHLY' else '%Y'
+            key = pos_date.strftime(fmt)
+            noaa_by_period.setdefault(key, [])
+            noaa_by_period[key].append((pos_date, noaa_number))
+
+    for period in noaa_by_period:
+        noaa_by_period[period].sort(key=lambda x: x[0])
+
+    periods = sorted(noaa_by_period.keys())
+
+    if search_type == 'MONTHLY':
+        counts = [
+            0 if len(noaa_by_period[p]) == 1
+            else len(noaa_by_period[p])
+            for p in periods
+        ]
+    else:
+        counts = [
+            abs(noaa_by_period[p][0][1] - noaa_by_period[p][-1][1])
+            for p in periods
+        ]
+
+    fmt = '%Y-%m' if search_type == 'MONTHLY' else '%Y'
+    period_dates = [datetime.strptime(p, fmt) for p in periods]
+
+    return periods, counts, period_dates
+
+
+def _configure_period_axis(ax, search_type, n_points):
+    """Configura o eixo x para períodos mensais ou anuais em PT-BR."""
+    if search_type == 'MONTHLY':
+        interval = 1 if n_points < 24 else (3 if n_points < 72 else 6)
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=interval))
+        ax.xaxis.set_major_formatter(_pt_month_formatter('%b %Y'))
+    else:
+        ax.xaxis.set_major_locator(mdates.YearLocator(base=1))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.setp(ax.get_xticklabels(), rotation=55, ha='right')
 
 
 def create_sunspots_amount_graphic(result, img_bytes, initial_date, final_date, search_type):
-    if search_type == "MONTHLY":
-        plt.figure(figsize=(30, 15))
-    else:
-        plt.figure(figsize=(22, 10))
-    # Coleta de dados de manchas solares por período
-    # Em vez de armazenar apenas o noaa_number, armazene uma tupla (data, noaa_number)
-    noaa_numbers_by_period = {}
-    for entry in result:
-        positions = entry['latestPositions']
-        for pos in positions:
-            pos_date = datetime.strptime(pos['date'], '%Y-%m-%d')
-            noaa_number = int(entry['noaaNumber'])
-            period_key = pos_date.strftime('%Y-%m' if search_type == 'MONTHLY' else '%Y')
+    """Gráfico de dispersão: quantidade de manchas solares por período."""
+    periods, counts, period_dates = _build_sunspot_series(result, search_type)
 
-            if period_key not in noaa_numbers_by_period:
-                noaa_numbers_by_period[period_key] = []
-            noaa_numbers_by_period[period_key].append((pos_date, noaa_number))
+    figsize = (28, 13) if search_type == "MONTHLY" else (20, 10)
+    fig, ax = plt.subplots(figsize=figsize)
 
-    # Ordena os dados de cada período pela data
-    for period in noaa_numbers_by_period:
-        noaa_numbers_by_period[period].sort(key=lambda x: x[0])
+    # Linha conectando os pontos para visualizar tendência
+    ax.plot(
+        period_dates, counts,
+        color='#1f77b4', linewidth=1.2, alpha=0.4, zorder=1,
+    )
+    ax.scatter(
+        period_dates, counts,
+        marker='o', color='#1f77b4', alpha=0.8, s=50,
+        edgecolors='white', linewidths=0.5,
+        label='Manchas solares', zorder=2,
+    )
 
-    # Calcula a contagem com base no primeiro e último valor ordenado
-    periods = sorted(noaa_numbers_by_period.keys())
+    ax.set_xlabel('Período', fontsize=16)
+    ax.set_ylabel('Quantidade de Manchas', fontsize=16)
 
-    sunspot_counts = 0
-    if search_type == 'MONTHLY':    
-        sunspot_counts = [
-            0 if len(noaa_numbers_by_period[period]) ==  1
-            else len(noaa_numbers_by_period[period])
-            for period in periods
-        ]
-    else:
-        sunspot_counts = [
-        abs(noaa_numbers_by_period[period][0][1] - noaa_numbers_by_period[period][-1][1])
-        for period in periods
-    ]
-
-    period_dates = [datetime.strptime(period, '%Y-%m' if search_type == 'MONTHLY' else '%Y') for period in periods]
-
-    # Plot com transparência e tamanho ajustado para evitar sobreposição
-    plt.scatter(period_dates, sunspot_counts, marker='o', color='b', alpha=0.6, s=40, label='Manchas Solares')
-
-    plt.xlabel('Período', fontsize=18)
-    plt.ylabel('Quantidade de Manchas', fontsize=18)
-
-    # Ajuste do título
-    title_period = "mensal" if search_type == 'MONTHLY' else "anual"
+    tipo = "mensal" if search_type == 'MONTHLY' else "anual"
     if search_type == 'MONTHLY':
-        title = f'Gráfico {title_period}: Número de manchas entre {date_format(initial_date, "%d de %b. de %Y")} e {date_format(final_date, "%d de %b. de %Y")}'
+        titulo = (
+            f'Quantidade {tipo} de manchas solares\n'
+            f'{date_format(initial_date, "%d de %b. de %Y")} — '
+            f'{date_format(final_date, "%d de %b. de %Y")}'
+        )
     else:
-        title = f'Gráfico {title_period}: Número de manchas entre {periods[0]} e {periods[-1]}'
-    plt.title(title, fontsize=18)
+        titulo = (
+            f'Quantidade {tipo} de manchas solares\n'
+            f'{periods[0]} — {periods[-1]}'
+        )
+    ax.set_title(titulo, fontsize=17, fontweight='bold')
 
-    plt.grid(True, linestyle='--', linewidth=0.5)
+    _configure_period_axis(ax, search_type, len(counts))
+    _apply_base_style(ax)
 
-    ax = plt.gca()
-    if search_type == 'MONTHLY':
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1 if len(sunspot_counts) < 24 else 3))  # Marcar meses no eixo x
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-    else:
-        ax.xaxis.set_major_locator(mdates.YearLocator(base=1))  
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))  
+    ax.set_ylim(-1, max(counts) + 5)
+    ax.legend(fontsize=13, loc='best', framealpha=0.9)
+    _add_source_label(ax, fontsize=10)
+
+    fig.tight_layout()
+    fig.savefig(img_bytes, format='png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
 
 
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+# ============================================================
+# 3) Gráfico: Ajuste senoidal (Fourier) — quantidade de manchas
+# ============================================================
 
-    # Rotacionar rótulos do eixo x
-    plt.xticks(rotation=60, ha='right', fontsize=12)
+def _fit_sinusoidal(x, y):
+    """Estima parâmetros senoidais via FFT + curve_fit. Retorna (popt, senoide_func)."""
+    y_detrended = y - np.mean(y)
+    yf = np.fft.fft(y_detrended)
+    xf = np.fft.fftfreq(len(x), d=1)
 
-    # Limite no eixo y
-    plt.ylim(-1, max(sunspot_counts) + 5)
+    mask = xf > 0
+    if not np.any(mask):
+        raise ValueError("FFT não encontrou frequências positivas.")
 
-    plt.text(0.95, 0.01, 'Fonte dos dados: SolarMonitor.org', transform=plt.gca().transAxes, fontsize=5)
+    f_dom = xf[mask][np.argmax(np.abs(yf[mask]))]
+    omega_ini = 2 * np.pi * f_dom
 
-    # Ajuste do layout
-    plt.subplots_adjust(left=0.08, right=0.95, top=0.92, bottom=0.15)
+    def senoide(x, amp, omega, fase, offset):
+        return amp * np.sin(omega * x + fase) + offset
 
-    # Salvando a imagem no buffer
-    plt.savefig(img_bytes, format='png')
-    plt.close()
+    p0 = [(np.max(y) - np.min(y)) / 2, omega_ini, 0, np.mean(y)]
+    popt, _ = curve_fit(senoide, x, y, p0=p0, maxfev=10000)
+    return popt, senoide
+
 
 def create_sunspots_amount_fourier_graphic(
-    result,
-    img_bytes,
-    initial_date,
-    final_date,
-    search_type,
-    max_harm=10
+    result, img_bytes, initial_date, final_date, search_type,
 ):
-    # ===============================
-    # 1) Construir série temporal
-    # ===============================
-    noaa_numbers_by_period = {}
-
+    """Gráfico com ajuste senoidal suave sobre contagem de manchas por período."""
+    # --- Construir série temporal (via set para evitar duplicatas) ---
+    noaa_by_period = {}
     for entry in result:
         for pos in entry["latestPositions"]:
             pos_date = datetime.strptime(pos["date"], "%Y-%m-%d")
-            period_key = pos_date.strftime("%Y-%m" if search_type == "MONTHLY" else "%Y")
+            fmt = "%Y-%m" if search_type == "MONTHLY" else "%Y"
+            key = pos_date.strftime(fmt)
+            noaa_by_period.setdefault(key, set())
+            noaa_by_period[key].add(entry["noaaNumber"])
 
-            noaa_numbers_by_period.setdefault(period_key, set())
-            noaa_numbers_by_period[period_key].add(entry["noaaNumber"])
+    periods = sorted(noaa_by_period.keys())
+    y = np.array([len(noaa_by_period[p]) for p in periods], dtype=float)
 
-    periods = sorted(noaa_numbers_by_period.keys())
-    y = np.array([len(noaa_numbers_by_period[p]) for p in periods], dtype=float)
+    fmt = "%Y-%m" if search_type == "MONTHLY" else "%Y"
+    period_dates = [datetime.strptime(p, fmt) for p in periods]
 
-    period_dates = [
-        datetime.strptime(p, "%Y-%m" if search_type == "MONTHLY" else "%Y")
-        for p in periods
-    ]
-
-    # ===============================
-    # 2) Converter datas → eixo numérico
-    # ===============================
     x = np.arange(len(y))
-
     if len(x) < 6:
-        raise ValueError("Poucos pontos para ajuste senoidal.")
+        raise ValueError("Poucos pontos para ajuste senoidal (mínimo 6).")
 
-    dt = 1  # amostragem uniforme (1 mês ou 1 ano)
+    # --- Ajuste senoidal ---
+    popt, senoide = _fit_sinusoidal(x, y)
+    amp_fit, omega_fit, fase_fit, offset_fit = popt
 
-    # ===============================
-    # 3) FFT para estimar período dominante
-    # ===============================
-    y_detrended = y - np.mean(y)
+    # --- Curva suave com alta resolução ---
+    n_smooth = max(500, len(x) * 20)
+    x_smooth = np.linspace(x[0], x[-1], n_smooth)
+    y_smooth = senoide(x_smooth, *popt)
 
-    yf = np.fft.fft(y_detrended)
-    xf = np.fft.fftfreq(len(x), dt)
+    date_start = mdates.date2num(period_dates[0])
+    date_end = mdates.date2num(period_dates[-1])
+    smooth_dates = mdates.num2date(np.linspace(date_start, date_end, n_smooth))
 
-    mask = xf > 0
-    xf = xf[mask]
-    yf = np.abs(yf[mask])
+    # --- Plot ---
+    figsize = (28, 13) if search_type == "MONTHLY" else (20, 10)
+    fig, ax = plt.subplots(figsize=figsize)
 
-    if len(xf) == 0:
-        raise ValueError("FFT não encontrou frequências positivas.")
-
-    f_dom = xf[np.argmax(yf)]
-    periodo_estimado = 1 / f_dom
-    omega_inicial = 2 * np.pi / periodo_estimado
-
-    # ===============================
-    # 4) Modelo senoidal
-    # ===============================
-    def senoide(x, A, omega, fase, C):
-        return A * np.sin(omega * x + fase) + C
-
-    estimativa_inicial = [
-        (np.max(y) - np.min(y)) / 2,  # Amplitude como no código original
-        omega_inicial,                # Frequência angular vinda da FFT
-        0,                            # Fase inicial
-        np.mean(y)                    # Offset
-    ]
-
-    popt, _ = curve_fit(senoide, x, y, p0=estimativa_inicial)
-    A_fit, omega_fit, fase_fit, C_fit = popt
-
-    y_fit = senoide(x, A_fit, omega_fit, fase_fit, C_fit)
-
-    # ===============================
-    # 5) Plot
-    # ===============================
-    plt.figure(figsize=(30, 15) if search_type == "MONTHLY" else (22, 10))
-
-    plt.scatter(
-        period_dates,
-        y,
-        marker="o",
-        alpha=0.6,
-        s=60,
-        label="Quantidade observada",
-        zorder=3
+    ax.scatter(
+        period_dates, y,
+        marker='o', alpha=0.7, s=60, color='#1f77b4',
+        edgecolors='white', linewidths=0.5,
+        label='Quantidade observada', zorder=3,
     )
 
-    plt.plot(
-        period_dates,
-        y_fit,
-        linewidth=3,
-        label=f"Ajuste Senoidal (Período ≈ {2*np.pi/omega_fit:.1f} períodos)"
+    unidade = "meses" if search_type == "MONTHLY" else "anos"
+    periodo_est = abs(2 * np.pi / omega_fit)
+    ax.plot(
+        smooth_dates, y_smooth,
+        color='#ff7f0e', linewidth=3,
+        label=f'Ajuste senoidal (período ≈ {periodo_est:.1f} {unidade})',
+        zorder=2,
     )
 
-    plt.xlabel("Período", fontsize=18)
-    plt.ylabel("Quantidade de manchas solares", fontsize=18)
+    ax.set_xlabel('Período', fontsize=16)
+    ax.set_ylabel('Quantidade de manchas solares', fontsize=16)
 
-    title_period = "mensal" if search_type == 'MONTHLY' else "anual"
+    tipo = "mensal" if search_type == 'MONTHLY' else "anual"
     if search_type == 'MONTHLY':
-        title = f'Gráfico {title_period}: Número de manchas entre {initial_date} e {final_date}'
-    else:
-        title = f'Gráfico {title_period}: Número de manchas entre {periods[0]} e {periods[-1]}'
-
-    plt.title(title, fontsize=20)
-    plt.grid(True, linestyle="--", linewidth=0.5)
-
-    ax = plt.gca()
-
-    if search_type == "MONTHLY":
-        ax.xaxis.set_major_locator(
-            mdates.MonthLocator(interval=1 if len(y) < 24 else 3)
+        titulo = (
+            f'Ajuste senoidal ({tipo}) — Manchas solares\n'
+            f'{date_format(initial_date, "%d de %b. de %Y")} — '
+            f'{date_format(final_date, "%d de %b. de %Y")}'
         )
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
     else:
-        ax.xaxis.set_major_locator(mdates.YearLocator(base=1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+        titulo = (
+            f'Ajuste senoidal ({tipo}) — Manchas solares\n'
+            f'{periods[0]} — {periods[-1]}'
+        )
 
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.xticks(rotation=60, ha="right", fontsize=12)
+    ax.set_title(titulo, fontsize=18, fontweight='bold')
 
-    plt.ylim(-1, max(y) + 5)
-    plt.legend(fontsize=14)
+    _configure_period_axis(ax, search_type, len(y))
+    _apply_base_style(ax)
 
-    plt.text(
-        0.95,
-        0.01,
-        "Fonte dos dados: SolarMonitor.org",
-        transform=ax.transAxes,
-        fontsize=8,
-        ha="right"
+    ax.set_ylim(-1, max(y) + 5)
+    ax.legend(fontsize=14, loc='best', framealpha=0.9)
+    _add_source_label(ax, fontsize=10)
+
+    fig.tight_layout()
+    fig.savefig(img_bytes, format='png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+
+# ============================================================
+# 4) Gráfico Fourier individual: Longitude x Tempo com senóide
+# ============================================================
+
+def create_fourier_graphic(result, img_bytes, initial_date, final_date):
+    """Gráfico de longitude x tempo com ajuste senoidal para cada mancha."""
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    has_data = False
+
+    for idx, entry in enumerate(result):
+        noaa_number = entry['noaaNumber']
+        positions = entry['latestPositions']
+
+        dates = [datetime.strptime(pos['day'], '%Y-%m-%d') for pos in positions]
+        longitudes = np.array([pos['longitude'] for pos in positions], dtype=float)
+
+        if len(dates) < 4:
+            continue
+
+        has_data = True
+        color = _COLOR_CYCLE[idx % len(_COLOR_CYCLE)]
+
+        ax.scatter(
+            dates, longitudes,
+            s=90, alpha=0.8, color=color, edgecolors='white', linewidths=0.5,
+            label=f'Mancha {noaa_number}', zorder=3,
+        )
+
+        # Ajuste senoidal na longitude
+        x_num = mdates.date2num(dates)
+        x_norm = x_num - x_num[0]
+
+        try:
+            popt, senoide = _fit_sinusoidal(x_norm, longitudes)
+
+            n_smooth = 300
+            x_smooth = np.linspace(x_norm[0], x_norm[-1], n_smooth)
+            y_smooth = senoide(x_smooth, *popt)
+            dates_smooth = mdates.num2date(x_smooth + x_num[0])
+
+            ax.plot(
+                dates_smooth, y_smooth,
+                linewidth=2.5, color=color, alpha=0.7,
+                label=f'Ajuste senoidal ({noaa_number})',
+            )
+        except (ValueError, RuntimeError):
+            # Se o ajuste falhar, plota apenas linha simples
+            ax.plot(dates, longitudes, linewidth=1, color=color, alpha=0.4)
+
+    if not has_data:
+        ax.text(
+            0.5, 0.5, 'Dados insuficientes para ajuste',
+            transform=ax.transAxes, ha='center', va='center', fontsize=16,
+        )
+
+    ax.set_xlabel('Data', fontsize=14)
+    ax.set_ylabel('Longitude (°)', fontsize=14)
+
+    titulo = (
+        f'Ajuste senoidal — Longitude × Tempo\n'
+        f'{date_format(initial_date, "%d de %b. de %Y")} — '
+        f'{date_format(final_date, "%d de %b. de %Y")}'
     )
+    ax.set_title(titulo, fontsize=13, fontweight='bold')
 
-    plt.subplots_adjust(left=0.08, right=0.95, top=0.90, bottom=0.18)
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+    ax.xaxis.set_major_formatter(_pt_month_formatter('%d/%m/%y'))
+    plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
 
-    plt.savefig(img_bytes, format="png")
-    plt.close()
+    _apply_base_style(ax)
+    ax.legend(loc='best', fontsize=11, framealpha=0.9)
+    _add_source_label(ax, fontsize=10)
+
+    fig.tight_layout()
+    fig.savefig(img_bytes, format='png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
